@@ -422,14 +422,8 @@ namespace ms
 			return Button::State::PRESSED;
 		case Buttons::BtExit:
 		{
-			uint16_t width = Setting<Width>::get().load();
-			uint16_t height = Setting<Height>::get().load();
-
-			// Restore the user's pre-cashshop UI scale (transition() forced
-			// it to 1.0 so the 1024x768 cash shop UI fit the window exactly).
-			Constants::Constants::get().set_ui_scale(get_pre_cashshop_ui_scale());
-			Constants::Constants::get().set_viewwidth(width);
-			Constants::Constants::get().set_viewheight(height);
+			Constants::Constants::get().clear_viewport_size();
+			Window::get().update_viewport();
 
 			float fadestep = 0.025f;
 
@@ -566,9 +560,8 @@ namespace ms
 	{
 		UI& ui = UI::get();
 
-		// Restore UI scale + physical window size that were overridden in
-		// SetCashShopHandler::transition(). Without this the game world would
-		// remain confined to the 1024x768 cash-shop window at scale 1.0.
+		// Restore the regular logical canvas and its matching viewport before
+		// rebuilding the gameplay UI.
 		//
 		// This has to happen *before* change_state: UIStateGame and every
 		// window it builds lay themselves out against the logical viewport
@@ -577,11 +570,8 @@ namespace ms
 		// for the positions it loads from the config). Constructing them while
 		// the cash shop's 1024x768 was still in force left the whole HUD
 		// anchored to a viewport that vanished a frame later.
-		uint16_t width = Setting<Width>::get().load();
-		uint16_t height = Setting<Height>::get().load();
-		Constants::Constants::get().set_ui_scale(get_pre_cashshop_ui_scale());
-		Constants::Constants::get().set_viewwidth(width);
-		Constants::Constants::get().set_viewheight(height);
+		Constants::Constants::get().clear_viewport_size();
+		Window::get().update_viewport();
 
 		ui.change_state(UI::State::GAME);
 

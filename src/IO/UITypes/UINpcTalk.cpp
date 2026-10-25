@@ -30,6 +30,7 @@
 #include "../../Data/ItemData.h"
 #include "../../Constants.h"
 #include "../../Graphics/Geometry.h"
+#include "../../Util/Misc.h"
 
 #include <cctype>
 #include <cmath>
@@ -43,45 +44,42 @@ namespace ms
 {
 	UINpcTalk::UINpcTalk() : offset(0), unitrows(0), rowmax(0), show_slider(false), draw_text(false), formatted_text(""), formatted_text_pos(0), timestep(0), selection_top(0), hovered_selection(-1)
 	{
-		nl::node UtilDlgEx = nl::nx::ui["UIWindow2.img"]["UtilDlgEx"];
-
-		top = UtilDlgEx["t"];
-		fill = UtilDlgEx["c"];
-		bottom = UtilDlgEx["s"];
-		nametag = UtilDlgEx["bar"];
-
-		// dot0/dot1/list0/list1 don't exist at UIWindow2.img/UtilDlgEx in v83
-		// and the node lookup was picking up unrelated bitmaps ("QUESTS IN
-		// PROGRESS" stickers) that rendered over each selection row. Try
-		// the v83 path (UIWindow.img/UtilDlgEx) first and only accept nodes
-		// that actually resolve to something.
+		// Use the v153 dialog frame and buttons when available. Keep the v83
+		// selection decorations first because UIWindow2 has unrelated assets at
+		// some of these names.
 		nl::node UtilDlgEx_v83 = nl::nx::ui["UIWindow.img"]["UtilDlgEx"];
+		nl::node UtilDlgEx_v2 = nl::nx::ui["UIWindow2.img"]["UtilDlgEx"];
 
 		auto pick = [](nl::node a, nl::node b) -> nl::node
 		{
 			return a ? a : b;
 		};
 
-		dot_normal = pick(UtilDlgEx_v83["dot0"], UtilDlgEx["dot0"]);
-		dot_hovered = pick(UtilDlgEx_v83["dot1"], UtilDlgEx["dot1"]);
-		list_normal = pick(UtilDlgEx_v83["list0"], UtilDlgEx["list0"]);
-		list_hovered = pick(UtilDlgEx_v83["list1"], UtilDlgEx["list1"]);
+		top = pick(UtilDlgEx_v2["t"], UtilDlgEx_v83["t"]);
+		fill = pick(UtilDlgEx_v2["c"], UtilDlgEx_v83["c"]);
+		bottom = pick(UtilDlgEx_v2["s"], UtilDlgEx_v83["s"]);
+		nametag = pick(UtilDlgEx_v2["bar"], UtilDlgEx_v83["bar"]);
+
+		dot_normal = pick(UtilDlgEx_v83["dot0"], UtilDlgEx_v2["dot0"]);
+		dot_hovered = pick(UtilDlgEx_v83["dot1"], UtilDlgEx_v2["dot1"]);
+		list_normal = pick(UtilDlgEx_v83["list0"], UtilDlgEx_v2["list0"]);
+		list_hovered = pick(UtilDlgEx_v83["list1"], UtilDlgEx_v2["list1"]);
 
 		min_height = 8 * fill.height() + 14;
 
-		buttons[Buttons::CLOSE] = std::make_unique<MapleButton>(UtilDlgEx["BtClose"]);
-		buttons[Buttons::NEXT] = std::make_unique<MapleButton>(UtilDlgEx["BtNext"]);
-		buttons[Buttons::NO] = std::make_unique<MapleButton>(UtilDlgEx["BtNo"]);
-		buttons[Buttons::OK] = std::make_unique<MapleButton>(UtilDlgEx["BtOK"]);
-		buttons[Buttons::PREV] = std::make_unique<MapleButton>(UtilDlgEx["BtPrev"]);
-		buttons[Buttons::QNO] = std::make_unique<MapleButton>(UtilDlgEx["BtQNo"]);
-		buttons[Buttons::QYES] = std::make_unique<MapleButton>(UtilDlgEx["BtQYes"]);
-		buttons[Buttons::YES] = std::make_unique<MapleButton>(UtilDlgEx["BtYes"]);
-		buttons[Buttons::QSTART] = std::make_unique<MapleButton>(UtilDlgEx["BtQStart"]);
-		buttons[Buttons::QAFTER] = std::make_unique<MapleButton>(UtilDlgEx["BtQAfter"]);
-		buttons[Buttons::QCYES] = std::make_unique<MapleButton>(UtilDlgEx["BtQCYes"]);
-		buttons[Buttons::QCNO] = std::make_unique<MapleButton>(UtilDlgEx["BtQCNo"]);
-		buttons[Buttons::QGIVEUP] = std::make_unique<MapleButton>(UtilDlgEx["BtQGiveup"]);
+		buttons[Buttons::CLOSE] = std::make_unique<MapleButton>(pick(UtilDlgEx_v2["BtClose"], UtilDlgEx_v83["BtClose"]));
+		buttons[Buttons::NEXT] = std::make_unique<MapleButton>(pick(UtilDlgEx_v2["BtNext"], UtilDlgEx_v83["BtNext"]));
+		buttons[Buttons::NO] = std::make_unique<MapleButton>(pick(UtilDlgEx_v2["BtNo"], UtilDlgEx_v83["BtNo"]));
+		buttons[Buttons::OK] = std::make_unique<MapleButton>(pick(UtilDlgEx_v2["BtOK"], UtilDlgEx_v83["BtOK"]));
+		buttons[Buttons::PREV] = std::make_unique<MapleButton>(pick(UtilDlgEx_v2["BtPrev"], UtilDlgEx_v83["BtPrev"]));
+		buttons[Buttons::QNO] = std::make_unique<MapleButton>(pick(UtilDlgEx_v2["BtQNo"], UtilDlgEx_v83["BtQNo"]));
+		buttons[Buttons::QYES] = std::make_unique<MapleButton>(pick(UtilDlgEx_v2["BtQYes"], UtilDlgEx_v83["BtQYes"]));
+		buttons[Buttons::YES] = std::make_unique<MapleButton>(pick(UtilDlgEx_v2["BtYes"], UtilDlgEx_v83["BtYes"]));
+		buttons[Buttons::QSTART] = std::make_unique<MapleButton>(pick(UtilDlgEx_v2["BtQStart"], UtilDlgEx_v83["BtQStart"]));
+		buttons[Buttons::QAFTER] = std::make_unique<MapleButton>(pick(UtilDlgEx_v2["BtQAfter"], UtilDlgEx_v83["BtQAfter"]));
+		buttons[Buttons::QCYES] = std::make_unique<MapleButton>(pick(UtilDlgEx_v2["BtQCYes"], UtilDlgEx_v83["BtQCYes"]));
+		buttons[Buttons::QCNO] = std::make_unique<MapleButton>(pick(UtilDlgEx_v2["BtQCNo"], UtilDlgEx_v83["BtQCNo"]));
+		buttons[Buttons::QGIVEUP] = std::make_unique<MapleButton>(pick(UtilDlgEx_v2["BtQGiveup"], UtilDlgEx_v83["BtQGiveup"]));
 
 		name = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE);
 
@@ -924,13 +922,19 @@ namespace ms
 					std::string id_str = tx.substr(i + 2, end - i - 2);
 					if (!id_str.empty())
 					{
-						// Map names: pad to 9 digits, look up in string.nx
-						std::string padded = id_str;
-						while (padded.size() < 9)
-							padded.insert(0, 1, '0');
-
-						std::string name = (std::string)nl::nx::string["Map.img"][padded]["mapName"];
+						// String.wz groups map names by continent/category, not directly
+						// under Map.img/<id>. Use the same resolver as the minimap and
+						// world map so #m<id># works for taxi destinations too.
+						try
+						{
+							int32_t mapid = std::stoi(id_str);
+						std::string name = NxHelper::Map::get_map_info_by_id(mapid).name;
 						result += name.empty() ? ("Map " + id_str) : name;
+						}
+						catch (...)
+						{
+							result += "Map " + id_str;
+						}
 					}
 					i = end;
 					continue;

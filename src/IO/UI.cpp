@@ -19,6 +19,7 @@
 
 #include <vector>
 
+#include "../Configuration.h"
 #include "UIStateCashShop.h"
 #include "UIStateGame.h"
 #include "UIStateLogin.h"
@@ -36,6 +37,7 @@
 #include "UITypes/UIChat.h"
 #include "UITypes/UIChatBar.h"
 #include "UITypes/UIJoypad.h"
+#include "UITypes/UIKeyConfig.h"
 #include "UITypes/UINpcTalk.h"
 #include "UITypes/UIOptionMenu.h"
 #include "UITypes/UIQuit.h"
@@ -58,6 +60,11 @@ namespace ms
 	void UI::init()
 	{
 		cursor.init();
+		std::string saved_quickslots = Setting<QuickSlotKeys>::get().load();
+		std::array<uint8_t, Keyboard::NUM_QUICKSLOT_KEYS> quickslot_keys{};
+		if (Keyboard::parse_quickslot_keys(saved_quickslots, quickslot_keys))
+			keyboard.set_quickslot_keys(quickslot_keys);
+
 		change_state(State::LOGIN);
 		if(Configuration::get().get_auto_login()){
 			UI::get().get_element<UILogin>().get()->login();
@@ -295,6 +302,19 @@ namespace ms
 
 			return;
 		}
+
+		// Quick-slot editing listens to raw key events so it can bind keys that
+		// currently have no action assigned.
+		if (auto keyconfig = get_element<UIKeyConfig>())
+			if (keyconfig->is_quickslot_editing())
+			{
+				if (pressed && keycode == GLFW_KEY_ESCAPE)
+					keyconfig->cancel_quickslot_capture();
+				else if (pressed)
+					keyconfig->capture_quickslot_key(keycode);
+				is_key_down[keycode] = pressed;
+				return;
+			}
 
 		if (is_key_down[keyboard.capslockcode()])
 			caps_lock_enabled = !caps_lock_enabled;

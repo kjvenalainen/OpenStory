@@ -31,12 +31,6 @@ namespace ms
 		void transition() const;
 	};
 
-	// Returns the UI scale that was active immediately before the cash shop
-	// transition. The cash shop layout is authored at 1:1 for a 1024x768
-	// window, so the transition forces UI_SCALE to 1.0. Call this on exit
-	// to restore the user's previous scale.
-	float get_pre_cashshop_ui_scale();
-
 	// Last cash balances the server reported (QUERY_CASH_RESULT):
 	// 0 = NX credit, 1 = maple points, 2 = NX prepaid
 	int32_t get_cash_balance(int which);

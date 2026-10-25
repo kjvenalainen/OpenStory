@@ -218,30 +218,34 @@ namespace ms
 	{
 		switch (code)
 		{
+		// Number-row key ids follow the Maple key table: id 2 is "0", then
+		// ids 3..11 are "1".."9". These are deliberately not GLFW keycodes.
+		case 2: return "0"; case 3: return "1"; case 4: return "2"; case 5: return "3";
+		case 6: return "4"; case 7: return "5"; case 8: return "6"; case 9: return "7";
+		case 10: return "8"; case 11: return "9"; case 12: return "-"; case 13: return "=";
+		case 14: return "Bksp"; case 15: return "Tab";
 		// letters
 		case 16: return "Q"; case 17: return "W"; case 18: return "E"; case 19: return "R";
 		case 20: return "T"; case 21: return "Y"; case 22: return "U"; case 23: return "I";
 		case 24: return "O"; case 25: return "P";
+		case 26: return "["; case 27: return "]";
 		case 30: return "A"; case 31: return "S"; case 32: return "D"; case 33: return "F";
 		case 34: return "G"; case 35: return "H"; case 36: return "J"; case 37: return "K";
-		case 38: return "L";
+		case 38: return "L"; case 39: return ";"; case 40: return "'"; case 41: return "`";
+		case 43: return "\\";
 		case 44: return "Z"; case 45: return "X"; case 46: return "C"; case 47: return "V";
-		case 48: return "B"; case 49: return "N"; case 50: return "M";
-		// number row
-		case 2: return "1"; case 3: return "2"; case 4: return "3"; case 5: return "4";
-		case 6: return "5"; case 7: return "6"; case 8: return "7"; case 9: return "8";
-		case 10: return "9"; case 11: return "0";
+		case 48: return "B"; case 49: return "N"; case 50: return "M"; case 51: return ","; case 52: return ".";
 		// function keys
 		case 59: return "F1"; case 60: return "F2"; case 61: return "F3"; case 62: return "F4";
 		case 63: return "F5"; case 64: return "F6"; case 65: return "F7"; case 66: return "F8";
-		case 67: return "F9"; case 68: return "F10"; case 87: return "F11"; case 88: return "F12";
+		case 67: return "F9"; case 68: return "F10"; case 69: return "F11"; case 70: return "F12";
 		// modifiers / navigation (the default quickslot set)
-		case 42: case 54: return "Sh";
-		case 29: case 157: return "Ct";
-		case 56: return "Al";
-		case 82: return "Ins"; case 71: return "Hm"; case 73: return "PU";
-		case 83: return "Del"; case 79: return "End"; case 81: return "PD";
-		case 57: return "Sp"; case 15: return "Tab"; case 14: return "BS";
+		case 29: case 85: case 157: return "Ctl";
+		case 42: case 54: case 86: return "Shft";
+		case 56: case 87: return "Alt";
+		case 57: return "Spc";
+		case 71: return "Hme"; case 73: return "PgU"; case 79: return "End"; case 81: return "PgD";
+		case 82: return "Ins"; case 83: return "Del"; case 84: return "Esc"; case 88: return "Scr";
 		default: return std::to_string(static_cast<int>(code));
 		}
 	}
@@ -287,14 +291,10 @@ namespace ms
 		// these keep working whatever the NX build ships.
 		joblabel = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::YELLOW);
 		namelabel = Text(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::WHITE);
-		// Bold white key label drawn in each quickslot cube's corner.
-		qs_key_label = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::WHITE);
+		// White key labels with a dark outline, matching the keyboard panel legends.
+		qs_key_label = OutlinedText(Text::Font::A11M, Text::Alignment::CENTER,
+		                            Color::Name::WHITE, Color::Name::BLACK);
 		v83_menu_label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE);
-
-		// The quickslot key caps live in StatusBar.img in every build.
-		nl::node keynames = nl::nx::ui["StatusBar.img"]["key"];
-		for (int i = 0; i < 8; i++)
-			qs_key_sprites[i] = keynames[std::to_string(i)];
 
 		if (v83_layout)
 		{
@@ -1766,13 +1766,18 @@ namespace ms
 			int32_t keycode = quickslot_keys[i];
 			Point<int16_t> tl = quickslot_slot_pos(i);
 
+			Keyboard::Mapping mapping;
 			auto it = maplekeys.find(keycode);
-			bool bound = it != maplekeys.end()
-				&& it->second.type != KeyType::Id::NONE && it->second.action != 0;
+			if (auto keyconfig = UI::get().get_element<UIKeyConfig>(); keyconfig && keyconfig->is_active())
+				mapping = keyconfig->get_quickslot_preview(static_cast<uint8_t>(keycode));
+			else if (it != maplekeys.end())
+				mapping = it->second;
+
+			bool bound = mapping.type != KeyType::Id::NONE && mapping.action != 0;
 
 			if (bound)
 			{
-				Texture icon = get_quickslot_icon(it->second.type, it->second.action);
+				Texture icon = get_quickslot_icon(mapping.type, mapping.action);
 				if (icon.is_valid())
 				{
 					// Fit the (32px) icon into the cube and centre it — its
@@ -1793,27 +1798,12 @@ namespace ms
 				}
 			}
 
-			// Key label for EVERY cube (even empty ones), so the player always
-			// knows which key fires each slot. Drawn from the real binding, so it
-			// stays correct after rebinding and on the blank panel. Bottom-left
-			// corner keeps it clear of the centred icon.
-			static const uint8_t defcodes[8] = { 42, 82, 71, 73, 29, 83, 79, 81 };
-			bool default_key = i < 8 && (static_cast<uint8_t>(keycode) == defcodes[i]
-				|| (i == 0 && keycode == 54) || (i == 4 && keycode == 157));
-
-			if (default_key && qs_key_sprites[i].is_valid())
-			{
-				qs_key_sprites[i].draw(tl + Point<int16_t>(1, cell_h - 12 + label_nudge));
-			}
-			else
-			{
-				qs_key_label.change_text(qs_keyname(static_cast<uint8_t>(keycode)));
-
-				ColorBox label_bg(qs_key_label.width() + 4, 12, Color::Name::BLACK, 0.65f);
-				label_bg.draw(DrawArgument(tl + Point<int16_t>(0, cell_h - 11 + label_nudge)));
-
-				qs_key_label.draw(tl + Point<int16_t>(1, cell_h - 13 + label_nudge));
-			}
+			// The legacy frame bakes default key names into its keycaps. Draw the
+			// live label over them with a transparent background.
+			qs_key_label.change_text(qs_keyname(static_cast<uint8_t>(keycode)));
+			// CENTER alignment treats the draw position as the text's midpoint.
+			qs_key_label.draw(tl + Point<int16_t>(cell_w / 2,
+			                                    cell_h - 12 + label_nudge));
 		}
 	}
 
@@ -1922,6 +1912,18 @@ namespace ms
 
 	Cursor::State UIStatusBar::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
+		if (clicked)
+			if (auto keyconfig = UI::get().get_element<UIKeyConfig>())
+				if (keyconfig->is_quickslot_editing())
+				{
+					int16_t slot = quickslot_slot_at(cursorpos);
+					if (slot >= 0)
+					{
+						keyconfig->select_quickslot(slot);
+						return Cursor::State::IDLE;
+					}
+				}
+
 		// If cursor is over a quickslot cube that has a binding, allow the
 		// user to pick it up and drag it (either to another cube, or off the
 		// quickslot to clear the binding).

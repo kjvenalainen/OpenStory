@@ -121,6 +121,7 @@ namespace ms
 		settings.emplace<AllowAllianceInvite>();
 		settings.emplace<AllowFollow>();
 		settings.emplace<TrackedQuests>();
+		settings.emplace<QuickSlotKeys>();
 
 		load();
 	}
@@ -182,7 +183,7 @@ namespace ms
 			{ "Display",     { "Width", "Height", "Fullscreen", "VSync" } },
 			{ "Audio",       { "BGMVolume", "SFXVolume" } },
 			{ "Quality",     { "GraphicsQuality", "EffectsQuality", "ScreenShake" } },
-			{ "Input",       { "MouseSpeed", "Chatopen" } },
+			{ "Input",       { "MouseSpeed", "Chatopen", "QuickSlotKeys" } },
 			{ "Warnings",    { "HPWarning", "MPWarning" } },
 			{ "Permissions", { "AllowWhisper", "AllowChatInvite", "AllowPartyInvite",
 			                   "AllowGuildChat", "AllowAllianceChat", "AllowFamilyInvite",

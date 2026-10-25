@@ -30,6 +30,7 @@
 #include <memory>
 
 #include "../../Character/CharStats.h"
+#include "../../Graphics/SpecialText.h"
 #include "../../Graphics/Text.h"
 #include "../../Graphics/Animation.h"
 #include "../../Graphics/Geometry.h"
@@ -63,6 +64,7 @@ namespace ms
 		void update_boss_hp(const std::string& name, int8_t percent);
 
 		void toggle_qs();
+		bool is_quickslot_open() const { return show_quickslot; }
 		void toggle_menu();
 		void remove_menus();
 		bool is_menu_active();
@@ -214,7 +216,6 @@ namespace ms
 		// and self-positions when drawn at `position`.
 		bool quickslot_bg_v83 = false;
 		bool show_quickslot;
-		Texture qs_key_sprites[8];
 
 		// Quickslot drop support.
 		// The v83 panel shows 8 key bindings laid out in 2 rows of 4;
@@ -233,7 +234,7 @@ namespace ms
 		// Reusable label drawn on each quickslot cube showing its bound key name
 		// (change_text per slot). Keeps the key indicator correct after rebinding.
 		// mutable: draw() is const but we re-text it per slot.
-		mutable Text qs_key_label;
+		mutable OutlinedText qs_key_label;
 
 		// Drawn icons for bound quickslot entries (keyed by maple keycode).
 		mutable std::map<int32_t, Texture> qs_icon_cache;

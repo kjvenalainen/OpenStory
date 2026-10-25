@@ -37,6 +37,7 @@
 #include "../../Character/Job.h"
 
 #include "../../Net/Packets/SelectCharPackets.h"
+#include "../../Util/NxFiles.h"
 
 #ifdef _WIN32
 #define NOMINMAX
@@ -99,7 +100,7 @@ namespace ms
 		tab_map[1] = Buttons::CHARACTER_NEW;
 		tab_map[2] = Buttons::CHARACTER_DELETE;
 
-		nl::node Login = nl::nx::ui["Login.img"];
+		nl::node Login = NxFiles::login_ui();
 		nl::node Common = Login["Common"];
 		nl::node CharSelect = Login["CharSelect"];
 		nl::node selectWorld = Common["selectWorld"];

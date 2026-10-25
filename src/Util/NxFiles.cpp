@@ -19,7 +19,9 @@
 
 #ifdef USE_NX
 #include <fstream>
+#include <memory>
 
+#include <nlnx/file.hpp>
 #include <nlnx/node.hpp>
 #include <nlnx/nx.hpp>
 
@@ -64,6 +66,16 @@ namespace ms
 {
 	namespace NxFiles
 	{
+		namespace
+		{
+			std::unique_ptr<nl::file> legacy_ui;
+		}
+
+		nl::node login_ui()
+		{
+			return legacy_ui->root()["Login.img"];
+		}
+
 		Error init()
 		{
 #ifdef PLATFORM_IOS
@@ -81,6 +93,10 @@ namespace ms
 
 			try
 			{
+				// Open the legacy login assets here, while startup can still report
+				// an asset error cleanly. Opening this lazily while constructing the
+				// first UI screen would let an exception abort the whole process.
+				legacy_ui = std::make_unique<nl::file>("UI-v83.nx");
 				nl::nx::load_all();
 			}
 			catch (const std::exception& ex)

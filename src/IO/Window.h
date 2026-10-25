@@ -49,6 +49,7 @@ namespace ms
 		void end() const;
 		void fadeout(float step, std::function<void()> fadeprocedure);
 		void check_events();
+		void update_viewport();
 
 		void setclipboard(const std::string& text) const;
 		std::string getclipboard() const;

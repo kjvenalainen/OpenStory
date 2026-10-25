@@ -18,10 +18,12 @@
 #include "UIKeyConfig.h"
 
 #include "../UI.h"
+#include "../../Configuration.h"
 
 #include "../Components/MapleButton.h"
 #include "../UITypes/UILoginNotice.h"
 #include "../UITypes/UINotice.h"
+#include "../UITypes/UIStatusBar.h"
 
 #include "../../Data/ItemData.h"
 #include "../../Data/SkillData.h"
@@ -38,21 +40,30 @@ namespace ms
 	UIKeyConfig::UIKeyConfig(const Inventory& in_inventory, const SkillBook& in_skillbook) : UIDragElement<PosKEYCONFIG>(Point<int16_t>(480, 20)), inventory(in_inventory), skillbook(in_skillbook), dirty(false)
 	{
 		keyboard = &UI::get().get_keyboard();
+		original_quickslot_keys = keyboard->get_quickslot_keys();
 		staged_mappings = keyboard->get_maplekeys();
 
-		nl::node KeyConfig = nl::nx::ui["UIWindow2.img"]["KeyConfig"];
+		// Prefer the v153 UIWindow2 frame and buttons while keeping fallback to
+		// the original v83 nodes for assets missing from the newer UI.
+		nl::node KeyConfig_v83 = nl::nx::ui["UIWindow.img"]["KeyConfig"];
+		nl::node KeyConfig_v2 = nl::nx::ui["UIWindow2.img"]["KeyConfig"];
 
-		icon = KeyConfig["icon"];
+		auto pick = [](nl::node a, nl::node b) -> nl::node
+		{
+			return a ? a : b;
+		};
 
-		sprites.emplace_back(KeyConfig["backgrnd"]);
-		sprites.emplace_back(KeyConfig["backgrnd2"]);
-		sprites.emplace_back(KeyConfig["backgrnd3"]);
+		icon = pick(KeyConfig_v83["icon"], KeyConfig_v2["icon"]);
 
-		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(KeyConfig["BtCancel"]);
-		buttons[Buttons::DEFAULT] = std::make_unique<MapleButton>(KeyConfig["BtDefault"]);
-		buttons[Buttons::DELETE] = std::make_unique<MapleButton>(KeyConfig["BtDelete"]);
-		buttons[Buttons::KEYSETTING] = std::make_unique<MapleButton>(KeyConfig["BtQuickSlot"]);
-		buttons[Buttons::OK] = std::make_unique<MapleButton>(KeyConfig["BtOK"]);
+		sprites.emplace_back(pick(KeyConfig_v2["backgrnd"], KeyConfig_v83["backgrnd"]));
+		sprites.emplace_back(pick(KeyConfig_v2["backgrnd2"], KeyConfig_v83["backgrnd2"]));
+		sprites.emplace_back(pick(KeyConfig_v2["backgrnd3"], KeyConfig_v83["backgrnd3"]));
+
+		buttons[Buttons::CANCEL] = std::make_unique<MapleButton>(pick(KeyConfig_v2["BtCancel"], KeyConfig_v83["BtCancel"]));
+		buttons[Buttons::DEFAULT] = std::make_unique<MapleButton>(pick(KeyConfig_v2["BtDefault"], KeyConfig_v83["BtDefault"]));
+		buttons[Buttons::DELETE] = std::make_unique<MapleButton>(pick(KeyConfig_v2["BtDelete"], KeyConfig_v83["BtDelete"]));
+		buttons[Buttons::KEYSETTING] = std::make_unique<MapleButton>(pick(KeyConfig_v2["BtQuickSlot"], KeyConfig_v83["BtQuickSlot"]));
+		buttons[Buttons::OK] = std::make_unique<MapleButton>(pick(KeyConfig_v2["BtOK"], KeyConfig_v83["BtOK"]));
 
 		dimension = Point<int16_t>(622, 374);
 		dragarea = Point<int16_t>(622, 20);
@@ -435,6 +446,15 @@ namespace ms
 	{
 		UIElement::draw(inter);
 
+		if (quickslot_editing)
+		{
+			std::string message = quickslot_edit_index >= 0
+				? "Press a key for Quick Slot " + std::to_string(quickslot_edit_index + 1)
+				: "Click a Quick Slot, then press its new key";
+			Text hint(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::YELLOW, message);
+			hint.draw(position + Point<int16_t>(194, 3));
+		}
+
 		Point<int16_t> icon_offset(0, 0);
 
 		for (auto const& iter : staged_mappings)
@@ -494,6 +514,8 @@ namespace ms
 	void UIKeyConfig::close()
 	{
 		clear_tooltip();
+		keyboard->set_quickslot_keys(original_quickslot_keys);
+		quickslot_dirty = false;
 		deactivate();
 		reset();
 	}
@@ -547,6 +569,11 @@ namespace ms
 			break;
 		}
 		case Buttons::KEYSETTING:
+			quickslot_editing = true;
+			quickslot_edit_index = -1;
+			if (auto statusbar = UI::get().get_element<UIStatusBar>())
+				if (!statusbar->is_quickslot_open())
+					statusbar->toggle_qs();
 			break;
 		case Buttons::OK:
 		{
@@ -674,7 +701,74 @@ namespace ms
 	void UIKeyConfig::send_key(int32_t keycode, bool pressed, bool escape)
 	{
 		if (pressed && escape)
-			safe_close();
+		{
+			if (quickslot_editing)
+				cancel_quickslot_capture();
+			else
+				safe_close();
+		}
+	}
+
+	void UIKeyConfig::select_quickslot(int16_t slot)
+	{
+		if (quickslot_editing && slot >= 0 && slot < static_cast<int16_t>(Keyboard::NUM_QUICKSLOT_KEYS))
+			quickslot_edit_index = static_cast<int8_t>(slot);
+	}
+
+	Keyboard::Mapping UIKeyConfig::get_quickslot_preview(uint8_t maple_key) const
+	{
+		return is_active()
+			? get_staged_mapping(maple_key)
+			: keyboard->get_maple_mapping(maple_key);
+	}
+
+	void UIKeyConfig::capture_quickslot_key(int32_t glfw_key)
+	{
+		if (!quickslot_editing || quickslot_edit_index < 0)
+			return;
+
+		uint8_t maple_key = keyboard->get_maple_key(glfw_key);
+		if (maple_key > 0 && maple_key < KeyConfig::Key::LENGTH)
+			assign_quickslot_key(maple_key);
+	}
+
+	void UIKeyConfig::cancel_quickslot_capture()
+	{
+		quickslot_editing = false;
+		quickslot_edit_index = -1;
+	}
+
+	void UIKeyConfig::assign_quickslot_key(uint8_t new_key)
+	{
+		auto quickslots = keyboard->get_quickslot_keys();
+		uint8_t old_key = quickslots[quickslot_edit_index];
+
+		// Keep slots unique; if this key belongs to another slot, move that slot
+		// to the key just released.
+		for (size_t i = 0; i < quickslots.size(); ++i)
+			if (i != static_cast<size_t>(quickslot_edit_index) && quickslots[i] == new_key)
+				quickslots[i] = old_key;
+		quickslots[quickslot_edit_index] = new_key;
+
+		if (old_key != new_key)
+		{
+			Keyboard::Mapping old_mapping = get_staged_mapping(old_key);
+			Keyboard::Mapping new_mapping = get_staged_mapping(new_key);
+
+			staged_mappings.erase(old_key);
+			staged_mappings.erase(new_key);
+			if (new_mapping.type != KeyType::Id::NONE)
+				staged_mappings[old_key] = new_mapping;
+			if (old_mapping.type != KeyType::Id::NONE)
+				staged_mappings[new_key] = old_mapping;
+			dirty = true;
+			quickslot_dirty = true;
+			bound_actions.clear();
+			bind_staged_action_keys();
+		}
+
+		keyboard->set_quickslot_keys(quickslots);
+		quickslot_edit_index = -1;
 	}
 
 	UIElement::Type UIKeyConfig::get_type() const
@@ -930,6 +1024,13 @@ namespace ms
 				keyboard->assign(key, type, keyAction);
 		}
 
+		original_quickslot_keys = keyboard->get_quickslot_keys();
+		if (quickslot_dirty)
+		{
+			Setting<QuickSlotKeys>::get().save(Keyboard::format_quickslot_keys(original_quickslot_keys));
+			Configuration::get().save();
+			quickslot_dirty = false;
+		}
 		dirty = false;
 	}
 

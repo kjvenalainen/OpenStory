@@ -33,6 +33,8 @@
 // key_debug_enabled() below and the comment on its declaration in Keyboard.h.
 #include <cstdlib>
 #include <iostream>
+#include <sstream>
+#include <set>
 
 namespace ms
 {
@@ -226,6 +228,64 @@ namespace ms
 	const std::array<uint8_t, Keyboard::NUM_QUICKSLOT_KEYS>& Keyboard::get_quickslot_keys() const
 	{
 		return quickslotkeys;
+	}
+
+	bool Keyboard::parse_quickslot_keys(const std::string& value, std::array<uint8_t, NUM_QUICKSLOT_KEYS>& keys)
+	{
+		std::istringstream input(value);
+		std::string field;
+		std::set<uint8_t> unique;
+
+		for (size_t i = 0; i < keys.size(); ++i)
+		{
+			if (!std::getline(input, field, ',' ) || field.empty())
+				return false;
+
+			try
+			{
+				size_t consumed = 0;
+				int parsed = std::stoi(field, &consumed);
+				if (consumed != field.size() || parsed <= 0 || parsed >= KeyConfig::Key::LENGTH)
+					return false;
+				keys[i] = static_cast<uint8_t>(parsed);
+				if (!unique.insert(keys[i]).second)
+					return false;
+			}
+			catch (const std::exception&)
+			{
+				return false;
+			}
+		}
+
+		return input.peek() == std::char_traits<char>::eof();
+	}
+
+	std::string Keyboard::format_quickslot_keys(const std::array<uint8_t, NUM_QUICKSLOT_KEYS>& keys)
+	{
+		std::string value;
+		for (size_t i = 0; i < keys.size(); ++i)
+		{
+			if (i != 0)
+				value += ',';
+			value += std::to_string(keys[i]);
+		}
+		return value;
+	}
+
+	uint8_t Keyboard::get_maple_key(int32_t glfw_key) const
+	{
+		for (uint8_t key = 1; key < std::size(Keytable); ++key)
+			if (Keytable[key] == glfw_key)
+				return key;
+
+#ifdef PLATFORM_MACOS
+		if (glfw_key == GLFW_KEY_LEFT_SUPER)
+			return KeyConfig::Key::LEFT_ALT;
+		if (glfw_key == GLFW_KEY_RIGHT_SUPER)
+			return KeyConfig::Key::RIGHT_ALT;
+#endif
+
+		return 0;
 	}
 
 	int32_t Keyboard::leftshiftcode() const

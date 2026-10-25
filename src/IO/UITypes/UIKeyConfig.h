@@ -48,6 +48,11 @@ namespace ms
 		void unstage_mapping(Keyboard::Mapping mapping);
 
 		void update_item_count(InventoryType::Id type, int16_t slot, int16_t change);
+		bool is_quickslot_editing() const { return quickslot_editing; }
+		void select_quickslot(int16_t slot);
+		void capture_quickslot_key(int32_t glfw_key);
+		void cancel_quickslot_capture();
+		Keyboard::Mapping get_quickslot_preview(uint8_t maple_key) const;
 
 	protected:
 		Button::State button_pressed(uint16_t buttonid) override;
@@ -71,6 +76,7 @@ namespace ms
 		void bind_staged_action_keys();
 		void clear();
 		void reset();
+		void assign_quickslot_key(uint8_t new_key);
 
 		Texture get_item_texture(int32_t item_id) const;
 		Texture get_skill_texture(int32_t skill_id) const;
@@ -125,6 +131,10 @@ namespace ms
 		bool dirty;
 
 		Keyboard* keyboard = nullptr;
+		bool quickslot_editing = false;
+		int8_t quickslot_edit_index = -1;
+		bool quickslot_dirty = false;
+		std::array<uint8_t, Keyboard::NUM_QUICKSLOT_KEYS> original_quickslot_keys{};
 
 		nl::node icon;
 

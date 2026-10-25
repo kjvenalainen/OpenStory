@@ -16,6 +16,8 @@
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
 #include "MiscHandlers.h"
+
+#include "../../Configuration.h"
 #include "../../Data/ItemData.h"
 #include "../../Gameplay/Stage.h"
 #include "../../Gameplay/MapleMap/Npc.h"
@@ -24,7 +26,6 @@
 #include "../../IO/UITypes/UIChatBar.h"
 #include "../../IO/UITypes/UIStatusMessenger.h"
 #include "../../IO/UITypes/UINotice.h"
-#include "../../Configuration.h"
 #include "../Packets/NpcInteractionPackets.h"
 
 #include <array>
@@ -293,7 +294,13 @@ namespace ms
 				keys[i] = static_cast<uint8_t>(key);
 		}
 
-		// Store the layout the same way local key changes are kept.
+		// A saved local layout wins over the server's login-time default/custom
+		// layout so editing these keys persists across client restarts.
+		std::array<uint8_t, Keyboard::NUM_QUICKSLOT_KEYS> saved_keys{};
+		const std::string saved = Setting<QuickSlotKeys>::get().load();
+		if (Keyboard::parse_quickslot_keys(saved, saved_keys))
+			keys = saved_keys;
+
 		UI::get().get_keyboard().set_quickslot_keys(keys);
 	}
 

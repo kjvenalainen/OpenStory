@@ -45,12 +45,12 @@ namespace ms
 			// Logical dimensions (what game/UI code uses for positioning)
 			int16_t get_viewwidth()
 			{
-				return static_cast<int16_t>(PHYSWIDTH / UI_SCALE);
+				return VIEWWIDTH > 0 ? VIEWWIDTH : static_cast<int16_t>(PHYSWIDTH / UI_SCALE);
 			}
 
 			int16_t get_viewheight()
 			{
-				return static_cast<int16_t>(PHYSHEIGHT / UI_SCALE);
+				return VIEWHEIGHT > 0 ? VIEWHEIGHT : static_cast<int16_t>(PHYSHEIGHT / UI_SCALE);
 			}
 
 			// Physical dimensions (actual window/viewport size)
@@ -74,6 +74,21 @@ namespace ms
 				PHYSHEIGHT = height;
 			}
 
+			// Override the logical drawing canvas without changing the actual
+			// window size. Fixed-layout screens such as the cash shop use this
+			// while Window fits the canvas into the existing window.
+			void set_viewport_size(int16_t width, int16_t height)
+			{
+				VIEWWIDTH = width;
+				VIEWHEIGHT = height;
+			}
+
+			void clear_viewport_size()
+			{
+				VIEWWIDTH = 0;
+				VIEWHEIGHT = 0;
+			}
+
 			float get_ui_scale()
 			{
 				return UI_SCALE;
@@ -89,6 +104,8 @@ namespace ms
 			// Physical window dimensions
 			int16_t PHYSWIDTH;
 			int16_t PHYSHEIGHT;
+			int16_t VIEWWIDTH = 0;
+			int16_t VIEWHEIGHT = 0;
 			// UI scale factor (physical / logical)
 			float UI_SCALE;
 		};

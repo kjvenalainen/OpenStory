@@ -29,6 +29,7 @@
 #include "../../Audio/Audio.h"
 #include "../../Constants.h"
 #include "../../Net/Packets/LoginPackets.h"
+#include "../../Util/NxFiles.h"
 
 #include <algorithm>
 #include <cctype>
@@ -124,7 +125,7 @@ namespace ms
 
 		world_pos = WORLD_POS;
 
-		nl::node login = nl::nx::ui["Login.img"];
+		nl::node login = NxFiles::login_ui();
 		world_select = login["WorldSelect"];
 		world_src = world_select["BtWorld"];
 		channel_src = world_select["channel"];

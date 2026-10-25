@@ -22,6 +22,7 @@
 
 #include <array>
 #include <map>
+#include <string>
 
 namespace ms
 {
@@ -77,6 +78,10 @@ namespace ms
 		void set_quickslot_keys(const std::array<uint8_t, NUM_QUICKSLOT_KEYS>& keys);
 		// Return the quickslot bar's key layout.
 		const std::array<uint8_t, NUM_QUICKSLOT_KEYS>& get_quickslot_keys() const;
+		static bool parse_quickslot_keys(const std::string& value, std::array<uint8_t, NUM_QUICKSLOT_KEYS>& keys);
+		static std::string format_quickslot_keys(const std::array<uint8_t, NUM_QUICKSLOT_KEYS>& keys);
+		// Translate a GLFW key event to a Maple key id, or 0 if unsupported.
+		uint8_t get_maple_key(int32_t glfw_key) const;
 
 		int32_t leftshiftcode() const;
 		int32_t rightshiftcode() const;

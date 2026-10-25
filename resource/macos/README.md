@@ -5,7 +5,7 @@ Build inputs for `OpenStory.app`. Nothing here is used on Windows or Linux.
 | File | Purpose |
 | --- | --- |
 | `Info.plist.in` | Template for `Contents/Info.plist`, configured by CMake (`@ONLY`). |
-| `make_icns.cmake` | Derives `OpenStory.icns` from `resource/Icon.ico` with `sips` + `iconutil`. |
+| `make_icns.cmake` | Converts `resource/Icon.ico` into `OpenStory.icns` with `sips`. |
 
 ## Building
 
@@ -32,7 +32,7 @@ Cache variables:
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `OPENSTORY_DATA_DIR` | `<source>/wz` | Directory holding the `.nx` files and `Settings`. |
+| `OPENSTORY_DATA_DIR` | `<source>/../Client` | Directory holding the `.nx` files and `Settings`. |
 | `OPENSTORY_BUNDLE_ID` | `org.openstory.client` | `CFBundleIdentifier`. |
 | `OPENSTORY_BUNDLE_VERSION` | `1.0.0` | `CFBundleShortVersionString` / `CFBundleVersion`. |
 

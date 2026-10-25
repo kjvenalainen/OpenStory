@@ -21,6 +21,7 @@
 #include "UILoginWait.h"
 
 #include "../UI.h"
+#include "../../Util/NxFiles.h"
 #include "../UIScale.h"
 
 #include "../Components/MapleButton.h"
@@ -56,13 +57,14 @@ namespace ms
 		nl::node loginBackground = nl::nx::map["Back"]["login.img"];
 		nl::node back = loginBackground["back"];
 
-		nl::node loginUI = nl::nx::ui["Login.img"]["Title"];
+		nl::node legacyLogin = NxFiles::login_ui();
+		nl::node loginUI = legacyLogin["Title"];
 
 		nl::node Login = nl::nx::map.resolve("Obj/login.img");
 		nl::node signboard = nl::nx::map.resolve("Obj/login.img/Title/signboard/0/0");
 
 		nl::node logo = Login["Title"]["logo"]["0"];
-		nl::node frame = nl::nx::ui["Login.img"]["Common"]["frame"];
+		nl::node frame = legacyLogin["Common"]["frame"];
 
 		sprites.emplace_back(back["11"], UIScale::bg_args());
 		sprites.emplace_back(logo, Point<int16_t>(409, 144));

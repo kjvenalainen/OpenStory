@@ -35,7 +35,7 @@ namespace ms
 		attack.stance = user.get_look().get_stance();
 
 		if (attack.type == Attack::CLOSE)
-			attack.range = user.get_afterimage().get_range();
+			attack.range = Rectangle<int16_t>(-300, 0, -150, 150);
 	}
 
 	void RegularAttack::apply_hiteffects(const AttackUser&, Mob&) const {}

@@ -246,7 +246,11 @@ namespace ms
 
 	UIKeySelect::UIKeySelect(std::function<void(bool)> oh, bool l) : okhandler(oh), login(l)
 	{
-		nl::node KeyType = nl::nx::ui["UIWindow2.img"]["KeyConfig"]["KeyType"];
+		nl::node KeyType_v83 = nl::nx::ui["UIWindow.img"]["KeyConfig"]["KeyType"];
+		nl::node KeyType_v2 = nl::nx::ui["UIWindow2.img"]["KeyConfig"]["KeyType"];
+		auto pick = [](nl::node a, nl::node b) -> nl::node { return a ? a : b; };
+
+		nl::node KeyType = pick(KeyType_v2, KeyType_v83);
 		nl::node backgrnd = KeyType["backgrnd"];
 
 		sprites.emplace_back(backgrnd);
@@ -308,7 +312,9 @@ namespace ms
 
 	UIKeyConfirm::UIKeyConfirm(bool alternate, std::function<void()> oh, bool l) : okhandler(oh), login(l)
 	{
-		nl::node alert = nl::nx::ui["UIWindow2.img"]["KeyConfig"]["KeyType"]["alert"];
+		nl::node alert_v83 = nl::nx::ui["UIWindow.img"]["KeyConfig"]["KeyType"]["alert"];
+		nl::node alert_v2 = nl::nx::ui["UIWindow2.img"]["KeyConfig"]["KeyType"]["alert"];
+		nl::node alert = alert_v2 ? alert_v2 : alert_v83;
 		nl::node background = alternate ? alert["alternate"] : alert["default"];
 
 		sprites.emplace_back(background);

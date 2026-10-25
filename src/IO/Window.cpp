@@ -421,29 +421,7 @@ namespace ms
 		bool vsync = Setting<VSync>::get().load();
 		glfwSwapInterval(vsync ? 1 : 0);
 
-		// glViewport wants framebuffer PIXELS.
-		int fb_width, fb_height;
-		glfwGetFramebufferSize(glwnd, &fb_width, &fb_height);
-
-		// Cursor mapping wants LOGICAL WINDOW coordinates, which is what
-		// glfwGetCursorPos reports. These are equal on Windows but differ by
-		// the content scale on a Retina display (framebuffer is 2x window).
-		int win_width = fb_width;
-		int win_height = fb_height;
-		glfwGetWindowSize(glwnd, &win_width, &win_height);
-
-		if (win_width <= 0 || win_height <= 0)
-		{
-			win_width = fb_width;
-			win_height = fb_height;
-		}
-
-		// Stretch to fill entire screen — no black bars
-		s_vp_x = 0;
-		s_vp_y_top = 0;
-		s_vp_w = win_width;
-		s_vp_h = win_height;
-		glViewport(0, 0, fb_width, fb_height);
+		update_viewport();
 #ifndef PLATFORM_MACOS
 		// Fixed-function matrix stack; removed in a 4.1 Core profile.
 		glMatrixMode(GL_PROJECTION);
@@ -503,6 +481,45 @@ namespace ms
 		GraphicsGL::get().reinit();
 
 		return Error::Code::NONE;
+	}
+
+	void Window::update_viewport()
+	{
+		if (!glwnd)
+			return;
+
+		int fb_width = 0, fb_height = 0;
+		int win_width = 0, win_height = 0;
+		glfwGetFramebufferSize(glwnd, &fb_width, &fb_height);
+		glfwGetWindowSize(glwnd, &win_width, &win_height);
+
+		if (fb_width <= 0 || fb_height <= 0 || win_width <= 0 || win_height <= 0)
+			return;
+
+		const double aspect = static_cast<double>(Constants::Constants::get().get_viewwidth())
+			/ Constants::Constants::get().get_viewheight();
+		int vp_width = win_width;
+		int vp_height = win_height;
+
+		if (static_cast<double>(win_width) / win_height > aspect)
+			vp_width = static_cast<int>(win_height * aspect);
+		else
+			vp_height = static_cast<int>(win_width / aspect);
+
+		s_vp_x = (win_width - vp_width) / 2;
+		s_vp_y_top = (win_height - vp_height) / 2;
+		s_vp_w = vp_width;
+		s_vp_h = vp_height;
+
+		const double scale_x = static_cast<double>(fb_width) / win_width;
+		const double scale_y = static_cast<double>(fb_height) / win_height;
+		const int fb_vp_x = static_cast<int>(s_vp_x * scale_x);
+		const int fb_vp_y = static_cast<int>((win_height - s_vp_y_top - vp_height) * scale_y);
+		const int fb_vp_width = static_cast<int>(vp_width * scale_x);
+		const int fb_vp_height = static_cast<int>(vp_height * scale_y);
+
+		glViewport(fb_vp_x, fb_vp_y, fb_vp_width, fb_vp_height);
+		GraphicsGL::get().reinit();
 	}
 
 	bool Window::not_closed() const

@@ -24,13 +24,14 @@
 
 #include <array>
 #include <stdint.h>
+#include <nlnx/node.hpp>
 
 namespace ms
 {
 	namespace NxFiles
 	{
 		// Number of needed files
-		const constexpr uint8_t NUM_FILES = 16;
+		const constexpr uint8_t NUM_FILES = 17;
 
 		// Names of the needed game files
 		const constexpr std::array<const char*, NUM_FILES> filenames =
@@ -53,12 +54,17 @@ namespace ms
 			"Sound.nx",		// From latest
 			"String.nx",
 			"TamingMob.nx",
-			"UI.nx"			// From latest
+			"UI.nx",			// From latest
+			"UI-v83.nx"		// Login/world/character select artwork
 		};
 
 		// Initialize NX
 		// When successful test if the UI file is the correct version
 		Error init();
+
+		// Login screens use v83 artwork/layout even when gameplay uses a newer UI.nx.
+		// UI-v83.nx is required so this cannot silently fall back to mismatched UI.nx assets.
+		nl::node login_ui();
 	};
 }
 #endif

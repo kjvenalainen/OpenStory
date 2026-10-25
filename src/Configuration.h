@@ -871,6 +871,13 @@ namespace ms
 		TrackedQuests() : StringEntry("TrackedQuests", "") {}
 	};
 
+	// Comma-separated Maple key IDs for the eight quick-slot cells. Empty means
+	// the server-provided/default layout should be used until the player edits it.
+	struct QuickSlotKeys : public Configuration::StringEntry
+	{
+		QuickSlotKeys() : StringEntry("QuickSlotKeys", "") {}
+	};
+
 	template <typename T>
 	// Can be used to access settings
 	struct Setting
