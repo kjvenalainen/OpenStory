@@ -19,7 +19,9 @@
 
 #include <algorithm>
 #include <fstream>
+#include <iostream>
 #include <unordered_set>
+#include <utility>
 
 namespace ms
 {
@@ -136,7 +138,7 @@ namespace ms
 	void Configuration::load()
 	{
 		std::unordered_map<std::string, std::string> rawsettings;
-		std::ifstream file(FILENAME);
+		std::ifstream file(settings_path);
 
 		if (file.is_open())
 		{
@@ -158,9 +160,15 @@ namespace ms
 			}
 		}
 
-		// Replace default values with loaded values
+		// A reload can happen after startup selects the data directory. Reset
+		// first so settings missing from that file do not leak in from an earlier
+		// file read before the directory was selected.
 		for (auto& setting : settings)
 		{
+			if (!setting.second)
+				continue;
+
+			setting.second->value = setting.second->default_value;
 			auto rsiter = rawsettings.find(setting.second->name);
 
 			if (rsiter != rawsettings.end())
@@ -168,12 +176,20 @@ namespace ms
 		}
 	}
 
+	void Configuration::set_settings_path(std::string path)
+	{
+		settings_path = std::move(path);
+	}
+
 	void Configuration::save() const
 	{
-		std::ofstream config(FILENAME);
+		std::ofstream config(settings_path);
 
 		if (!config.is_open())
+		{
+			std::cerr << "Unable to open settings file for writing: " << settings_path << std::endl;
 			return;
+		}
 
 		// Section -> ordered key list. Anything not listed falls into Window
 		// Positions (if it starts with "Pos") or Other (alphabetical).
@@ -248,6 +264,10 @@ namespace ms
 			for (auto* e : positions)
 				config << e->to_string() << std::endl;
 		}
+
+		config.flush();
+		if (!config)
+			std::cerr << "Failed while writing settings file: " << settings_path << std::endl;
 	}
 
 	void Configuration::BoolEntry::save(bool b)

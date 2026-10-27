@@ -19,8 +19,28 @@
 
 #include "../PacketHandler.h"
 
+#include <cstdint>
+#include <vector>
+
 namespace ms
 {
+	struct CashShopItemEntry
+	{
+		int64_t instance_id;
+		int32_t item_id;
+		int32_t commodity_sn;
+		uint16_t count;
+		int64_t expiration;
+	};
+
+	const std::vector<CashShopItemEntry>& get_cash_shop_items();
+	bool get_cash_shop_item(int64_t instance_id, CashShopItemEntry& item);
+	void add_cash_shop_item(const CashShopItemEntry& item);
+	void replace_cash_shop_items(const std::vector<CashShopItemEntry>& items);
+	void remove_cash_shop_item(int64_t instance_id);
+	int64_t get_pending_cash_shop_withdrawal();
+	void set_pending_cash_shop_withdrawal(int64_t instance_id);
+
 	// Handler for entering the Cash Shop
 	class SetCashShopHandler : public PacketHandler
 	{

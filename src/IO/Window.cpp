@@ -78,8 +78,8 @@ namespace ms
 	// oversize handling in check_events() cannot catch this: it only runs when
 	// the size *changes*, and at startup width already equals physicalwidth.
 	//
-	// Shrink to the largest standard size that fits the monitor work area, and
-	// settle the resolution for the whole session so the logical view never
+	// Clamp unsupported saved sizes to a resolution offered by the options UI,
+	// and settle it for the whole session so the logical view never
 	// changes underneath the UI (see the comment on Setting<Width> below).
 	static void fit_window_to_monitor()
 	{
@@ -112,11 +112,15 @@ namespace ms
 			phys_h = Constants::Constants::get().get_physicalheight();
 		}
 
-		if (phys_w > avail_w || phys_h > avail_h)
+		if (phys_w > 1024 || phys_h > 768 || phys_w > avail_w || phys_h > avail_h)
 		{
 			static const int candidates[][2] = {
-				{ 1920, 1080 }, { 1600, 900 }, { 1440, 900 }, { 1366, 768 },
-				{ 1280, 720 }, { 1024, 768 }, { 800, 600 },
+				// Prefer the compact classic client size when a saved resolution
+				// is unsupported or too large. GLFW sizes macOS windows in points,
+				// so the largest fitting desktop mode can occupy nearly the whole
+				// display even though the options UI offers 1024x768.
+				{ 1024, 768 }, { 800, 600 }, { 1280, 720 }, { 1366, 768 },
+				{ 1440, 900 }, { 1600, 900 }, { 1920, 1080 },
 			};
 
 			phys_w = avail_w;

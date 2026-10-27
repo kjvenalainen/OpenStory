@@ -1,17 +1,17 @@
 //////////////////////////////////////////////////////////////////////////////////
 //	This file is part of the continued Journey MMORPG client					//
 //	Copyright (C) 2015-2019  Daniel Allendorf, Ryan Payton						//
-//																				//
+//																//
 //	This program is free software: you can redistribute it and/or modify		//
-//	it under the terms of the GNU Affero General Public License as published by	//
+//	it under the terms of the GNU Affero General Public License as published by//
 //	the Free Software Foundation, either version 3 of the License, or			//
 //	(at your option) any later version.											//
-//																				//
+//																//
 //	This program is distributed in the hope that it will be useful,				//
 //	but WITHOUT ANY WARRANTY; without even the implied warranty of				//
 //	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the				//
 //	GNU Affero General Public License for more details.							//
-//																				//
+//																//
 //	You should have received a copy of the GNU Affero General Public License	//
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
@@ -19,13 +19,16 @@
 
 #include "../UIElement.h"
 
-#include "../Components/Charset.h"
-#include "../Components/Gauge.h"
 #include "../Components/Slider.h"
+#include "../Components/Textfield.h"
 
 #include "../../Character/Look/CharLook.h"
 #include "../../Data/ItemData.h"
+#include "../../Graphics/Geometry.h"
 #include "../../Graphics/Text.h"
+
+#include <string>
+#include <vector>
 
 namespace ms
 {
@@ -38,197 +41,135 @@ namespace ms
 
 		UICashShop();
 
-			void draw(float inter) const;
+		void draw(float inter) const override;
 		void update() override;
 		void send_key(int32_t keycode, bool pressed, bool escape) override;
+		void send_scroll(double yoffset) override;
 
-		Button::State button_pressed(uint16_t buttonid);
-
+		Button::State button_pressed(uint16_t buttonid) override;
 		Cursor::State send_cursor(bool clicked, Point<int16_t> cursorpos) override;
 
 		UIElement::Type get_type() const override;
-
 		void exit_cashshop();
+		void request_exit();
 
 	private:
-		void update_items();
-
-		// 5 columns x 3 rows of the classic card cells (119x184) in the
-		// center panel, clear of the baked right-column panels
-		static constexpr uint8_t GRID_COLS = 5u;
-		static constexpr uint8_t GRID_ROWS = 3u;
-		static constexpr uint8_t MAX_ITEMS = GRID_COLS * GRID_ROWS;
-		static constexpr int16_t GRID_X = 140;
-		static constexpr int16_t GRID_Y = 50;
-		static constexpr int16_t STRIDE_X = 128;
-		static constexpr int16_t STRIDE_Y = 210;
-		static constexpr int16_t CARD_W = 119;
-		static constexpr int16_t CARD_H = 184;
+		static constexpr uint8_t GRID_COLS = 3;
+		static constexpr uint8_t GRID_ROWS = 5;
+		static constexpr uint8_t PAGE_SIZE = GRID_COLS * GRID_ROWS;
+		static constexpr int16_t CARD_W = 185;
+		static constexpr int16_t CARD_H = 124;
+		static constexpr int16_t GRID_X = 176;
+		static constexpr int16_t GRID_Y = 51;
+		static constexpr int16_t STRIDE_X = 190;
+		static constexpr int16_t STRIDE_Y = 127;
 
 		class Item
 		{
 		public:
-			enum Label : uint8_t
-			{
-				ACTION,
-				BOMB_SALE,
-				BONUS,
-				EVENT = 4,
-				HOT,
-				LIMITED,
-				LIMITED_BRONZE,
-				LIMITED_GOLD,
-				LIMITED_SILVER,
-				LUNA_CRYSTAL,
-				MASTER = 12,
-				MUST,
-				NEW,
-				SALE = 17,
-				SPEICAL,
-				SPECIAL_PRICE,
-				TIME,
-				TODAY,
-				WEEKLY,
-				WONDER_BERRY,
-				WORLD_SALE,
-				NONE
-			};
-
-			// price is the NX cash price from Commodity.img, not the
-			// item's meso shop price
-			Item(int32_t itemid, int32_t sn, Label label, int32_t price, uint16_t count) : sn(sn), label(label), price(price), discount_price(0), count(count), data(ItemData::get(itemid)) {}
+			Item(int32_t itemid, int32_t sn, int32_t price, uint16_t count)
+				: sn(sn), price(price), count(count), data(ItemData::get(itemid)) {}
 
 			int32_t sn;
-			Label label;
 			int32_t price;
-			int32_t discount_price;
 			uint16_t count;
 
-			void draw(const DrawArgument& args) const
-			{
-				data.get_icon(false).draw(args);
-			}
-
-			const std::string get_name() const
-			{
-				return data.get_name();
-			}
-
-			const std::string& get_desc() const
-			{
-				return data.get_desc();
-			}
-
-			int32_t get_itemid() const
-			{
-				return data.get_id();
-			}
-
-			const int32_t get_price() const
-			{
-				return price;
-			}
+			void draw(const DrawArgument& args) const { data.get_icon(false).draw(args); }
+			const std::string get_name() const { return data.get_name(); }
+			const std::string& get_desc() const { return data.get_desc(); }
+			int32_t get_itemid() const { return data.get_id(); }
 
 		private:
 			const ItemData& data;
 		};
 
+		enum Category : uint8_t
+		{
+			ALL_ITEMS,
+			EQUIPMENT,
+			USE_ITEMS,
+			SETUP_ITEMS,
+			ETC_ITEMS,
+			CASH_ITEMS,
+			PET_ITEMS,
+			PET_EQUIPS,
+			PET_MISC,
+			CATEGORY_COUNT
+		};
+
 		enum Buttons : uint16_t
 		{
-			BtPreview1,
-			BtPreview2,
-			BtPreview3,
 			BtExit,
-			BtChargeNX,
-			BtChargeRefresh,
-			BtMileage,
 			BtHelp,
 			BtCoupon,
-			BtNext,
-			BtPrev,
-			BtDetailPackage,
-			BtNonGrade,
-			BtBuyAvatar,
-			BtDefaultAvatar,
-			BtSaveAvatar,
-			BtTakeoffAvatar,
+			BtSearch,
+			BtChargeNX,
+			BtCouponSubmit,
+			BtCouponCancel,
+			BtHelpClose,
 			BtBuy
 		};
 
-		Point<int16_t> BestNew_dim;
+		enum Overlay : uint8_t
+		{
+			OVERLAY_NONE,
+			OVERLAY_COUPON,
+			OVERLAY_HELP
+		};
 
-		Sprite preview_sprites[3];
-		uint8_t preview_index;
+		void rebuild_filter();
+		void update_items();
+		void update_tooltip(Point<int16_t> cursorpos);
+		void choose_item(int16_t index);
+		void navigate_items(int32_t offset);
+		bool item_matches_category(const Item& item) const;
+		void close_overlay();
+		void schedule_exit();
 
-		Sprite menu_tabs[9];
-		uint8_t menu_index;
-
-		Text job_label;
-		Text name_label;
-		mutable Text cash_balance_text[3];
-
+		std::vector<Item> items;
+		std::vector<size_t> visible_items;
+		std::string applied_search;
+		int16_t page;
 		int16_t selected_item;
+		uint8_t category;
+
+		Sprite catalog_frame;
+		Texture item_base;
+		Texture coupon_bg;
+		Texture help_bg;
+		Texture search_bg;
+		Textfield search_field;
+		Textfield coupon_field;
+		Slider list_slider;
+
+		Text category_labels[CATEGORY_COUNT];
+		Text item_name[PAGE_SIZE];
+		Text item_price[PAGE_SIZE];
+		Text item_count[PAGE_SIZE];
+		Text player_name;
+		Text job_name;
+		mutable Text cash_balance_text[3];
+		mutable Text selected_name;
+		mutable Text selected_price;
+		mutable Text result_summary;
+		mutable Text empty_message;
+
+		ColorBox category_active_bg;
+		ColorBox category_hover_bg;
+		ColorBox card_selected_bg;
+		ColorBox coupon_shade;
 		CharLook preview_look;
 
-		// Controllable stage character
-		float char_x = 820.0f;
-		float char_yoff = 0.0f;
-		float char_vy = 0.0f;
-		bool char_jumping = false;
-		bool key_left = false;
-		bool key_right = false;
-		bool facing_right = true;
-		uint8_t cur_stance = 0;
-
-		Texture preview_scene[3];
-		mutable Text preview_name;
-		mutable Text preview_desc;
-		mutable Text preview_price;
-
-		std::vector<Sprite> promotion_sprites;
-		Point<int16_t> promotion_pos;
-		int8_t promotion_index;
-
-		Sprite mvp_sprites[7];
-		Point<int16_t> mvp_pos;
-		uint8_t mvp_grade;
-		Gauge mvp_gauge;
-		float_t mvp_exp;
-
-		Charset charge_charset;
-
-		Sprite item_base;
-		Sprite item_line;
-		Sprite item_none;
-		std::vector<Sprite> item_labels;
-		std::vector<Item> items;
-		Text item_name[MAX_ITEMS];
-		Text item_price[MAX_ITEMS];
-		Text item_discount[MAX_ITEMS];
-		Text item_percent[MAX_ITEMS];
-
-		Slider list_slider;
-		int16_t list_offset;
-
-		// Sub-panel backgrounds
-		Texture wishlist_bg;
-		Texture gift_bg;
-		Texture coupon_bg;
-		Texture search_bg;
-		Texture cs_inventory_bg;
-		Texture purchase_bg;
-
-		// Active sub-panel tracking
-		enum SubPanel : uint8_t
-		{
-			SUBPANEL_NONE,
-			SUBPANEL_WISHLIST,
-			SUBPANEL_GIFT,
-			SUBPANEL_COUPON,
-			SUBPANEL_SEARCH,
-			SUBPANEL_INVENTORY,
-			SUBPANEL_PURCHASE
-		};
-		SubPanel active_subpanel;
+		float char_x;
+		float char_yoff;
+		float char_vy;
+		bool char_jumping;
+		bool facing_right;
+		bool exit_pending;
+		int32_t tooltip_item_id;
+		int32_t return_mapid;
+		uint8_t return_portalid;
+		uint8_t cur_stance;
+		Overlay overlay;
 	};
 }

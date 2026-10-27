@@ -292,7 +292,7 @@ namespace ms
 		joblabel = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::YELLOW);
 		namelabel = Text(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::WHITE);
 		// White key labels with a dark outline, matching the keyboard panel legends.
-		qs_key_label = OutlinedText(Text::Font::A11M, Text::Alignment::CENTER,
+		qs_key_label = OutlinedText(Text::Font::A11B, Text::Alignment::CENTER,
 		                            Color::Name::WHITE, Color::Name::BLACK);
 		v83_menu_label = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE);
 
@@ -1863,6 +1863,15 @@ namespace ms
 			tx = SkillData::get(action).get_icon(SkillData::Icon::NORMAL);
 		else if (type == KeyType::Id::ITEM)
 			tx = ItemData::get(action).get_icon(false);
+		else if (type == KeyType::Id::ACTION || type == KeyType::Id::FACE)
+		{
+			// The key config stores built-in action and face icons by their
+			// KeyAction id (for example, ATTACK is icon 52).
+			nl::node keyconfig_icons = nl::nx::ui["UIWindow.img"]["KeyConfig"]["icon"];
+			if (!keyconfig_icons)
+				keyconfig_icons = nl::nx::ui["UIWindow2.img"]["KeyConfig"]["icon"];
+			tx = Texture(keyconfig_icons[std::to_string(action)]);
+		}
 		else if (type == KeyType::Id::MACRO)
 			tx = nl::nx::ui["UIWindow.img"]["SkillMacro"]["Macroicon"][std::to_string(action)]["icon"];
 

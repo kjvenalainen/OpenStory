@@ -61,6 +61,31 @@ namespace ms
 		return false;
 	}
 
+	bool Job::can_equip(uint16_t required_job) const
+	{
+		// v83 reqJob values are class bit flags, not job IDs.
+		// Keep this in sync with the class mapping shown by EquipTooltip.
+		uint16_t job_class = id / 100;
+
+		switch (required_job)
+		{
+		case 0:
+			return true;
+		case 1:
+			return job_class == 1 || job_class >= 20;
+		case 2:
+			return job_class == 2;
+		case 4:
+			return job_class == 3;
+		case 8:
+			return job_class == 4;
+		case 16:
+			return job_class == 5;
+		default:
+			return false;
+		}
+	}
+
 	bool Job::can_use(int32_t skill_id) const
 	{
 		uint16_t required = static_cast<uint16_t>(skill_id / 10000);

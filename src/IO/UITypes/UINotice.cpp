@@ -27,6 +27,8 @@
 #include "../../Audio/Audio.h"
 #include "../../Constants.h"
 
+#include <algorithm>
+
 #ifdef USE_NX
 #include <nlnx/nx.hpp>
 #endif
@@ -60,7 +62,21 @@ namespace ms
 		}
 
 		height = question.height();
-		dimension = Point<int16_t>(top.width(), top.height() + height + bottom.height());
+		// Keep the drag/reanchor footprint in sync with the panels drawn below.
+		// The previous text-only height ignored the center boxes (and the
+		// 32-pixel minimum body), so the visible yes/no dialog was much taller
+		// than its measured bounds. On resolution changes it was then anchored
+		// using the wrong size, which made the quit popup appear incorrectly
+		// scaled/positioned relative to the viewport.
+		int16_t body_height = 0;
+		if (type == NoticeType::ENTERNUMBER)
+			body_height = center.height() + centerbox.height() - 1
+				+ box2.height() + 29 + bottombox.height();
+		else
+			body_height = std::max<int16_t>(height, 32)
+				+ centerbox.height() + box.height() + bottombox.height();
+
+		dimension = Point<int16_t>(top.width(), top.height() + body_height);
 
 		// Settings store the top-left corner already (that's what
 		// UIDragElement saves). Re-centring on every open caused the

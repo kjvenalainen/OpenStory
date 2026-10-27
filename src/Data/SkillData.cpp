@@ -117,10 +117,12 @@ namespace ms
 			{ SkillId::AXE_PANIC, ATTACK },
 			{ SkillId::SWORD_COMA, ATTACK },
 			{ SkillId::AXE_COMA, ATTACK },
+			{ SkillId::SHOUT, ATTACK },
 			// Hero
 			{ SkillId::RUSH_HERO, ATTACK },
 			{ SkillId::BRANDISH, ATTACK },
 			// Page
+			{ SkillId::THREATEN, ATTACK },
 			// White Knight
 			{ SkillId::CHARGE, ATTACK },
 			// Paladin
@@ -152,7 +154,19 @@ namespace ms
 			// No data for this skill level
 			{ SkillId::FIRE_DEMON, ATTACK },
 			{ SkillId::PARALYZE, ATTACK | RANGED },
-			{ SkillId::METEOR_SHOWER, ATTACK }
+			{ SkillId::METEOR_SHOWER, ATTACK },
+			// Thief
+			{ SkillId::DOUBLE_STAB, ATTACK },
+			{ SkillId::LUCKY_SEVEN, ATTACK | RANGED },
+			{ SkillId::AVENGER, ATTACK | RANGED },
+			{ SkillId::TRIPLE_THROW, ATTACK | RANGED },
+			{ SkillId::NINJA_STORM, ATTACK },
+			{ SkillId::SAVAGE_BLOW, ATTACK },
+			{ SkillId::ASSAULTER, ATTACK },
+			{ SkillId::BAND_OF_THIEVES, ATTACK },
+			{ SkillId::MESO_EXPLOSION, ATTACK },
+			{ SkillId::ASSASSINATE, ATTACK },
+			{ SkillId::BOOMERANG_STEP, ATTACK }
 		};
 
 		auto iter = skill_flags.find(id);

@@ -71,9 +71,9 @@ namespace ms
 		else
 			quality = "";
 
-		name = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE, idata.get_name(), 240);
-		desc = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, idata.get_desc(), 185);
-		qual = Text(Text::Font::A12M, Text::Alignment::CENTER, Color::Name::ORANGE, quality, 185);
+		name = Text(Text::Font::A14B, Text::Alignment::LEFT, Color::Name::WHITE, idata.get_name(), 240);
+		desc = Text(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::WHITE, idata.get_desc(), 185);
+		qual = Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::ORANGE, quality, 185);
 
 		fillwidth = 264;
 		fillheight = 83 + name.height();

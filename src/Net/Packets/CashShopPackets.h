@@ -37,6 +37,18 @@ namespace ms
 		}
 	};
 
+	// Opcode: BUY_CS_ITEM(229), action 0x0D — withdraw an item from the
+	// server-side cash shop locker into the character inventory.
+	class WithdrawCashItemPacket : public OutPacket
+	{
+	public:
+		WithdrawCashItemPacket(int64_t instance_id) : OutPacket(OutPacket::Opcode::BUY_CS_ITEM)
+		{
+			write_byte(0x0D);
+			write_long(instance_id);
+		}
+	};
+
 	// Opcode: COUPON_CODE(216)
 	class CouponCodePacket : public OutPacket
 	{

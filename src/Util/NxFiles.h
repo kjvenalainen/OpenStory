@@ -31,7 +31,7 @@ namespace ms
 	namespace NxFiles
 	{
 		// Number of needed files
-		const constexpr uint8_t NUM_FILES = 17;
+		const constexpr uint8_t NUM_FILES = 16;
 
 		// Names of the needed game files
 		const constexpr std::array<const char*, NUM_FILES> filenames =
@@ -54,16 +54,14 @@ namespace ms
 			"Sound.nx",		// From latest
 			"String.nx",
 			"TamingMob.nx",
-			"UI.nx",			// From latest
-			"UI-v83.nx"		// Login/world/character select artwork
+			"UI.nx"				// v83 UI, including login/world/character select artwork
 		};
 
 		// Initialize NX
 		// When successful test if the UI file is the correct version
 		Error init();
 
-		// Login screens use v83 artwork/layout even when gameplay uses a newer UI.nx.
-		// UI-v83.nx is required so this cannot silently fall back to mismatched UI.nx assets.
+		// Login screens use the same v83 UI.nx file as the rest of the client.
 		nl::node login_ui();
 	};
 }

@@ -949,7 +949,7 @@ namespace ms
 
 		int16_t reqJOB = equipdata.get_reqstat(MapleStat::Id::JOB);
 
-		if (!stats.get_job().is_sub_job(reqJOB))
+		if (!stats.get_job().can_equip(reqJOB))
 		{
 			UI::get().emplace<UIOk>("Your current job\\ncannot equip the selected item.", [](bool) {});
 			return false;

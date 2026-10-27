@@ -73,6 +73,7 @@ namespace ms
 		void clear_tooltip();
 
 		void save_staged_mappings();
+		void persist_quickslot_keys(const std::array<uint8_t, Keyboard::NUM_QUICKSLOT_KEYS>& keys);
 		void bind_staged_action_keys();
 		void clear();
 		void reset();
@@ -195,7 +196,7 @@ namespace ms
 		   { KeyConfig::Key::PERIOD,		Keyboard::Mapping(KeyType::Id::MENU,	KeyAction::Id::FRIENDS)				},
 		   { KeyConfig::Key::LEFT_CONTROL,	Keyboard::Mapping(KeyType::Id::ACTION,	KeyAction::Id::ATTACK)				},
 		   { KeyConfig::Key::LEFT_ALT,		Keyboard::Mapping(KeyType::Id::ACTION,	KeyAction::Id::JUMP)				},
-		   { KeyConfig::Key::SPACE,			Keyboard::Mapping(KeyType::Id::MENU,	KeyAction::Id::INTERACT_HARVEST)	},
+		   { KeyConfig::Key::SPACE,			Keyboard::Mapping(KeyType::Id::ACTION,	KeyAction::Id::NPC_CHAT)			},
 		   { KeyConfig::Key::RIGHT_ALT,		Keyboard::Mapping(KeyType::Id::ACTION,	KeyAction::Id::JUMP)				},
 		   { KeyConfig::Key::RIGHT_CONTROL,	Keyboard::Mapping(KeyType::Id::ACTION,	KeyAction::Id::ATTACK)				}
 		};
@@ -245,7 +246,7 @@ namespace ms
 		   { KeyConfig::Key::M,				Keyboard::Mapping(KeyType::Id::MENU,	KeyAction::Id::MINIMAP)				},
 		   { KeyConfig::Key::LEFT_CONTROL,	Keyboard::Mapping(KeyType::Id::ACTION,	KeyAction::Id::ATTACK)				},
 		   { KeyConfig::Key::LEFT_ALT,		Keyboard::Mapping(KeyType::Id::ACTION,	KeyAction::Id::JUMP)				},
-		   { KeyConfig::Key::SPACE,			Keyboard::Mapping(KeyType::Id::MENU,	KeyAction::Id::INTERACT_HARVEST)	},
+		   { KeyConfig::Key::SPACE,			Keyboard::Mapping(KeyType::Id::ACTION,	KeyAction::Id::NPC_CHAT)			},
 		   { KeyConfig::Key::RIGHT_ALT,		Keyboard::Mapping(KeyType::Id::ACTION,	KeyAction::Id::JUMP)				},
 		   { KeyConfig::Key::RIGHT_CONTROL,	Keyboard::Mapping(KeyType::Id::ACTION,	KeyAction::Id::ATTACK)				}
 		};

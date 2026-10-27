@@ -412,7 +412,7 @@ namespace ms
 
 			if (cashshop && cashshop->is_active())
 			{
-				// The cash shop stage character takes the movement keys
+				// The cash shop uses the arrow keys to navigate catalog items.
 				cashshop->send_key(mapping.action, pressed, escape);
 				sent = true;
 			}
@@ -513,6 +513,7 @@ namespace ms
 
 					// Game
 					types.emplace_back(UIElement::Type::NOTICE);
+					types.emplace_back(UIElement::Type::NPCTALK);
 				}
 				else if (tab)
 				{
@@ -522,6 +523,10 @@ namespace ms
 					types.emplace_back(UIElement::Type::SKILLBOOK);
 					types.emplace_back(UIElement::Type::QUESTLOG);
 					types.emplace_back(UIElement::Type::USERLIST);
+				}
+				else if (arrows)
+				{
+					types.emplace_back(UIElement::Type::NPCTALK);
 				}
 
 				if (types.size() > 0)

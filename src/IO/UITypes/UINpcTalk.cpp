@@ -797,11 +797,69 @@ namespace ms
 
 	void UINpcTalk::send_key(int32_t keycode, bool pressed, bool escape)
 	{
-		if (pressed && escape)
+		if (!pressed)
+			return;
+
+		if (escape)
 		{
 			deactivate();
 
 			NpcTalkMorePacket(type, 0).dispatch();
+			return;
+		}
+
+		if (type == TalkType::SENDSIMPLE && !selections.empty())
+		{
+			if (keycode == KeyAction::Id::UP)
+			{
+				selection_top = std::max<int16_t>(0, selection_top - 1);
+				hovered_selection = selection_top;
+			}
+			else if (keycode == KeyAction::Id::DOWN)
+			{
+				selection_top = std::min<int16_t>(
+					static_cast<int16_t>(selections.size() - 1), selection_top + 1);
+				hovered_selection = selection_top;
+			}
+			else if (keycode == KeyAction::Id::RETURN)
+			{
+				int32_t selected = hovered_selection >= 0
+					? hovered_selection : selection_top;
+				if (selected >= 0 && selected < static_cast<int32_t>(selections.size()))
+				{
+					deactivate();
+					NpcTalkMorePacket(selections[selected].index).dispatch();
+				}
+			}
+			return;
+		}
+
+		if (keycode != KeyAction::Id::RETURN)
+			return;
+
+		switch (type)
+		{
+		case TalkType::SENDOK:
+			button_pressed(Buttons::OK);
+			break;
+		case TalkType::SENDNEXT:
+		case TalkType::SENDNEXTPREV:
+			button_pressed(Buttons::NEXT);
+			break;
+		case TalkType::SENDYESNO:
+			button_pressed(Buttons::YES);
+			break;
+		case TalkType::SENDACCEPTDECLINE:
+			button_pressed(Buttons::QYES);
+			break;
+		case TalkType::SENDGETTEXT:
+			button_pressed(Buttons::OK);
+			break;
+		case TalkType::SENDGETNUMBER:
+			button_pressed(Buttons::OK);
+			break;
+		default:
+			break;
 		}
 	}
 
@@ -928,8 +986,8 @@ namespace ms
 						try
 						{
 							int32_t mapid = std::stoi(id_str);
-						std::string name = NxHelper::Map::get_map_info_by_id(mapid).name;
-						result += name.empty() ? ("Map " + id_str) : name;
+							std::string name = NxHelper::Map::get_map_info_by_id(mapid).name;
+							result += name.empty() ? ("Map " + id_str) : name;
 						}
 						catch (...)
 						{
@@ -1254,6 +1312,8 @@ namespace ms
 	void UINpcTalk::change_text(int32_t npcid, int8_t msgtype, int16_t style, int8_t speakerbyte, const std::string& tx)
 	{
 		type = is_valid_type(msgtype) ? static_cast<TalkType>(msgtype) : TalkType::NONE;
+		selection_top = 0;
+		hovered_selection = -1;
 
 		current_npcid = npcid;
 		expanded_quest_ids.clear();

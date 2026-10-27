@@ -257,6 +257,12 @@ if(APPLE)
 
     else()
 
+        # Resolve assets and Settings relative to the selected game-data
+        # directory when the .app is launched from Finder (whose cwd is not
+        # the data directory). MapleStory.cpp reloads Configuration after the
+        # startup chdir so local key settings persist to this same directory.
+        target_compile_definitions(OpenStory PRIVATE MS_MACOS_DATA_RESOLVER)
+
         set(OPENSTORY_BUNDLE_ID "org.openstory.client"
             CACHE STRING "CFBundleIdentifier for OpenStory.app")
         set(OPENSTORY_BUNDLE_VERSION "1.0.0"

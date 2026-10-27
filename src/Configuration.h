@@ -36,6 +36,8 @@ namespace ms
 		// If something is missing, set the default value.
 		// Can be used for reloading
 		void load();
+		// Pin reads and writes to the selected game-data directory.
+		void set_settings_path(std::string path);
 		// Save the current settings 
 		void save() const;
 		// Get private member SHOW_FPS
@@ -126,10 +128,11 @@ namespace ms
 		class Entry
 		{
 		protected:
-			Entry(const char* n, const char* v) : name(n), value(v) {}
+			Entry(const char* n, const char* v) : name(n), value(v), default_value(v) {}
 
 			std::string name;
 			std::string value;
+			std::string default_value;
 
 		private:
 			friend class Configuration;
@@ -224,7 +227,7 @@ namespace ms
 		template <typename T>
 		friend struct Setting;
 
-		const char* FILENAME = "Settings";
+		std::string settings_path = "Settings";
 		const char* TITLE = "OpenStory";
 		const char* VERSION = "83";
 		const char* LoginMusic = "BgmUI.img/Title";

@@ -197,7 +197,10 @@ namespace ms
 				? std::string(resolved) : candidate;
 
 			if (chdir(target.c_str()) == 0)
+			{
+				Configuration::get().set_settings_path(target + "/Settings");
 				return;
+			}
 		}
 
 		// Nothing found. Leave the working directory alone - NxFiles::init()

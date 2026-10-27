@@ -18,6 +18,7 @@
 #include "CashShopHandlers.h"
 
 #include "Helpers/CashShopParser.h"
+#include "Helpers/ItemParser.h"
 
 #include "../../Gameplay/Stage.h"
 #include "../../IO/UI.h"
@@ -26,8 +27,66 @@
 #include "../../IO/UITypes/UIMTS.h"
 #include "../../IO/Window.h"
 
+#include <algorithm>
+
 namespace ms
 {
+	static std::vector<CashShopItemEntry> s_cash_shop_items;
+	static int64_t s_pending_cash_shop_withdrawal = 0;
+
+	const std::vector<CashShopItemEntry>& get_cash_shop_items()
+	{
+		return s_cash_shop_items;
+	}
+
+	bool get_cash_shop_item(int64_t instance_id, CashShopItemEntry& item)
+	{
+		for (const CashShopItemEntry& entry : s_cash_shop_items)
+			if (entry.instance_id == instance_id)
+			{
+				item = entry;
+				return true;
+			}
+
+		return false;
+	}
+
+	void add_cash_shop_item(const CashShopItemEntry& item)
+	{
+		for (CashShopItemEntry& entry : s_cash_shop_items)
+			if (entry.instance_id == item.instance_id)
+			{
+				entry = item;
+				return;
+			}
+
+		s_cash_shop_items.push_back(item);
+	}
+
+	void replace_cash_shop_items(const std::vector<CashShopItemEntry>& items)
+	{
+		s_cash_shop_items = items;
+		s_pending_cash_shop_withdrawal = 0;
+	}
+
+	void remove_cash_shop_item(int64_t instance_id)
+	{
+		s_cash_shop_items.erase(
+			std::remove_if(s_cash_shop_items.begin(), s_cash_shop_items.end(),
+				[instance_id](const CashShopItemEntry& item) { return item.instance_id == instance_id; }),
+			s_cash_shop_items.end());
+	}
+
+	int64_t get_pending_cash_shop_withdrawal()
+	{
+		return s_pending_cash_shop_withdrawal;
+	}
+
+	void set_pending_cash_shop_withdrawal(int64_t instance_id)
+	{
+		s_pending_cash_shop_withdrawal = instance_id;
+	}
+
 	void SetCashShopHandler::handle(InPacket& recv) const
 	{
 		CashShopParser::parseCharacterInfo(recv);
@@ -74,10 +133,75 @@ namespace ms
 
 		switch (operation)
 		{
+		case 0x4B:
+		{
+			// Authoritative cash shop locker snapshot sent when entering the shop.
+			const uint16_t count = static_cast<uint16_t>(recv.read_short());
+			std::vector<CashShopItemEntry> items;
+			items.reserve(count);
+			for (uint16_t i = 0; i < count; i++)
+			{
+				CashShopItemEntry item;
+				item.instance_id = recv.read_long();
+				recv.read_int(); // account id
+				recv.read_int(); // character id
+				item.item_id = recv.read_int();
+				item.commodity_sn = recv.read_int();
+				item.count = static_cast<uint16_t>(recv.read_short());
+				recv.skip(13); // sender
+				item.expiration = recv.read_long();
+				recv.read_long(); // reserved
+				items.push_back(item);
+			}
+			recv.read_short(); // storage slots
+			recv.read_short(); // character slots
+			replace_cash_shop_items(items);
+			break;
+		}
 		case 0x4A:
 		{
-			// Buy item success
+			// Some server revisions send this short success acknowledgement.
 			chat::log("[Cash Shop] Item purchased successfully!", chat::LineType::YELLOW);
+			break;
+		}
+		case 0x57:
+		{
+			// Purchase confirmation carries one cash-item record:
+			// instance id, account id, character id, item id, commodity SN,
+			// count, sender, expiration, and a reserved long.
+			CashShopItemEntry item;
+			item.instance_id = recv.read_long();
+			recv.read_int(); // account id
+			recv.read_int(); // character id
+			item.item_id = recv.read_int();
+			item.commodity_sn = recv.read_int();
+			item.count = static_cast<uint16_t>(recv.read_short());
+			recv.skip(13); // sender
+			item.expiration = recv.read_long();
+			recv.read_long(); // reserved
+
+			add_cash_shop_item(item);
+			chat::log("[Cash Shop] Item purchased successfully!", chat::LineType::YELLOW);
+			break;
+		}
+		case 0x68:
+		{
+			// Successful locker withdrawal returns the destination character slot
+			// followed by the complete inventory item record.
+			const int16_t slot = recv.read_short();
+			const int64_t instance_id = get_pending_cash_shop_withdrawal();
+			CashShopItemEntry item;
+			if (instance_id == 0 || !get_cash_shop_item(instance_id, item))
+			{
+				chat::log("[Cash Shop] Received an item transfer without a matching locker item.", chat::LineType::RED);
+				break;
+			}
+
+			Inventory& inventory = Stage::get().get_player().get_inventory();
+			ItemParser::parse_item(recv, InventoryType::by_item_id(item.item_id), slot, inventory);
+			remove_cash_shop_item(instance_id);
+			set_pending_cash_shop_withdrawal(0);
+			chat::log("[Cash Shop] Item moved to your inventory.", chat::LineType::YELLOW);
 			break;
 		}
 		case 0x4C:

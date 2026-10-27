@@ -75,7 +75,11 @@ namespace ms
 			SIT = 51,
 			ATTACK = 52,
 			JUMP = 53,
-			INTERACT_HARVEST = 54,
+			// v83 NPC Chat / interaction binding. Keep the server keymap ID 54;
+			// later clients reuse the same slot for a combined interact/harvest
+			// label, but this client uses it to talk to nearby NPCs.
+			NPC_CHAT = 54,
+			INTERACT_HARVEST = NPC_CHAT, // Compatibility name for existing callers.
 			// Face expressions (type 6)
 			FACE1 = 100,
 			FACE2 = 101,

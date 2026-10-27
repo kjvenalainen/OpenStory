@@ -26,6 +26,16 @@
 
 namespace ms
 {
+	namespace
+	{
+		// The legacy equip tooltip's req/stat lettering is supplied as tiny
+		// per-character sprites. Enlarge those sprites slightly so they stay
+		// legible alongside the larger live text at high-density resolutions.
+		constexpr float TOOLTIP_GLYPH_SCALE_X = 1.2f;
+		constexpr float TOOLTIP_GLYPH_SCALE_Y = 1.15f;
+		constexpr int16_t TOOLTIP_GLYPH_SPACING = 7;
+	}
+
 	EquipTooltip::EquipTooltip()
 	{
 		nl::node Item = nl::nx::ui["UIToolTip.img"]["Item"];
@@ -210,23 +220,23 @@ namespace ms
 					switch (prank_preview)
 					{
 					case Equip::Potential::POT_HIDDEN:
-						potflag_preview = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::RED);
+						potflag_preview = Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::RED);
 						potflag_preview.change_text("(Hidden Potential)");
 						break;
 					case Equip::Potential::POT_RARE:
-						potflag_preview = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE);
+						potflag_preview = Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE);
 						potflag_preview.change_text("(Rare Item)");
 						break;
 					case Equip::Potential::POT_EPIC:
-						potflag_preview = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE);
+						potflag_preview = Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE);
 						potflag_preview.change_text("(Epic Item)");
 						break;
 					case Equip::Potential::POT_UNIQUE:
-						potflag_preview = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE);
+						potflag_preview = Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE);
 						potflag_preview.change_text("(Unique Item)");
 						break;
 					case Equip::Potential::POT_LEGENDARY:
-						potflag_preview = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE);
+						potflag_preview = Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE);
 						potflag_preview.change_text("(Legendary Item)");
 						break;
 					default:
@@ -282,26 +292,26 @@ namespace ms
 						namestr.append(")");
 					}
 
-					name_preview = Text(Text::Font::A12B, Text::Alignment::LEFT, namecolor, namestr, 400);
-					atkinc_preview = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::DUSTYGRAY, "ATT INCREASE");
+					name_preview = Text(Text::Font::A14B, Text::Alignment::LEFT, namecolor, namestr, 400);
+					atkinc_preview = Text(Text::Font::A13M, Text::Alignment::RIGHT, Color::Name::DUSTYGRAY, "ATT INCREASE");
 
 					std::string desctext = itemdata.get_desc();
 					hasdesc_preview = desctext.size() > 0;
 
 					if (hasdesc_preview)
 					{
-						desc_preview = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, desctext, 250);
+						desc_preview = Text(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::WHITE, desctext, 250);
 						height_preview += desc_preview.height() + 10;
 					}
 
-					category_preview = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "Type: " + equipdata.get_type());
+					category_preview = Text(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::WHITE, "Type: " + equipdata.get_type());
 
 					is_weapon_preview = equipdata.is_weapon();
 
 					if (is_weapon_preview)
 					{
 						const WeaponData& weapon = WeaponData::get(item_id);
-						wepspeed_preview = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "Attack Speed: " + weapon.getspeedstring());
+						wepspeed_preview = Text(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::WHITE, "Attack Speed: " + weapon.getspeedstring());
 					}
 					else
 					{
@@ -312,14 +322,14 @@ namespace ms
 
 					if (hasslots_preview)
 					{
-						slots_preview = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "Remaining Enhancements: " + std::to_string(equip.get_slots()));
+						slots_preview = Text(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::WHITE, "Remaining Enhancements: " + std::to_string(equip.get_slots()));
 
 						std::string vicious = std::to_string(equip.get_vicious());
 
 						if (equip.get_vicious() > 1)
 							vicious.append(" (MAX) ");
 
-						hammers_preview = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "Hammers Applied: " + vicious);
+						hammers_preview = Text(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::WHITE, "Hammers Applied: " + vicious);
 					}
 					else
 					{
@@ -342,7 +352,7 @@ namespace ms
 								statstr.append(std::to_string(abs(delta)) + ")");
 							}
 
-							statlabels_preview[es] = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, EquipStat::names[es] + std::string(": ") + statstr);
+							statlabels_preview[es] = Text(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::WHITE, EquipStat::names[es] + std::string(": ") + statstr);
 						}
 						else
 						{
@@ -423,23 +433,23 @@ namespace ms
 		switch (prank)
 		{
 		case Equip::Potential::POT_HIDDEN:
-			potflag = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::RED);
+			potflag = Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::RED);
 			potflag.change_text("(Hidden Potential)");
 			break;
 		case Equip::Potential::POT_RARE:
-			potflag = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE);
+			potflag = Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE);
 			potflag.change_text("(Rare Item)");
 			break;
 		case Equip::Potential::POT_EPIC:
-			potflag = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE);
+			potflag = Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE);
 			potflag.change_text("(Epic Item)");
 			break;
 		case Equip::Potential::POT_UNIQUE:
-			potflag = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE);
+			potflag = Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE);
 			potflag.change_text("(Unique Item)");
 			break;
 		case Equip::Potential::POT_LEGENDARY:
-			potflag = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::WHITE);
+			potflag = Text(Text::Font::A13M, Text::Alignment::CENTER, Color::Name::WHITE);
 			potflag.change_text("(Legendary Item)");
 			break;
 		default:
@@ -495,26 +505,26 @@ namespace ms
 			namestr.append(")");
 		}
 
-		name = Text(Text::Font::A12B, Text::Alignment::LEFT, namecolor, namestr, 400);
-		atkinc = Text(Text::Font::A11M, Text::Alignment::RIGHT, Color::Name::DUSTYGRAY, "ATT INCREASE");
+		name = Text(Text::Font::A14B, Text::Alignment::LEFT, namecolor, namestr, 400);
+		atkinc = Text(Text::Font::A13M, Text::Alignment::RIGHT, Color::Name::DUSTYGRAY, "ATT INCREASE");
 
 		std::string desctext = itemdata.get_desc();
 		hasdesc = desctext.size() > 0;
 
 		if (hasdesc)
 		{
-			desc = Text(Text::Font::A12M, Text::Alignment::LEFT, Color::Name::WHITE, desctext, 250);
+			desc = Text(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::WHITE, desctext, 250);
 			height += desc.height() + 10;
 		}
 
-		category = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "Type: " + equipdata.get_type());
+		category = Text(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::WHITE, "Type: " + equipdata.get_type());
 
 		is_weapon = equipdata.is_weapon();
 
 		if (is_weapon)
 		{
 			const WeaponData& weapon = WeaponData::get(item_id);
-			wepspeed = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "Attack Speed: " + weapon.getspeedstring());
+			wepspeed = Text(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::WHITE, "Attack Speed: " + weapon.getspeedstring());
 		}
 		else
 		{
@@ -525,14 +535,14 @@ namespace ms
 
 		if (hasslots)
 		{
-			slots = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "Remaining Enhancements: " + std::to_string(equip.get_slots()));
+			slots = Text(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::WHITE, "Remaining Enhancements: " + std::to_string(equip.get_slots()));
 
 			std::string vicious = std::to_string(equip.get_vicious());
 
 			if (equip.get_vicious() > 1)
 				vicious.append(" (MAX) ");
 
-			hammers = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "Hammers Applied: " + vicious);
+			hammers = Text(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::WHITE, "Hammers Applied: " + vicious);
 		}
 		else
 		{
@@ -555,7 +565,7 @@ namespace ms
 					statstr.append(std::to_string(abs(delta)) + ")");
 				}
 
-				statlabels[es] = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, EquipStat::names[es] + std::string(": ") + statstr);
+				statlabels[es] = Text(Text::Font::A13M, Text::Alignment::LEFT, Color::Name::WHITE, EquipStat::names[es] + std::string(": ") + statstr);
 			}
 			else
 			{
@@ -644,7 +654,8 @@ namespace ms
 			atkinc_pos = false;
 		}
 
-		atkincset[atkinc_pos].draw(atkincstr, 11, pos + Point<int16_t>(239, 26));
+		atkincset[atkinc_pos].draw(atkincstr, 13,
+			DrawArgument(pos + Point<int16_t>(239, 26), TOOLTIP_GLYPH_SCALE_X, TOOLTIP_GLYPH_SCALE_Y));
 
 		pos.shift_y(12);
 
@@ -652,12 +663,15 @@ namespace ms
 		{
 			Point<int16_t> reqpos = reqstatpositions[ms];
 			bool reqok = canequip[ms];
-			reqstattextures[ms][reqok].draw(pos + reqpos);
+			reqstattextures[ms][reqok].draw(
+				DrawArgument(pos + reqpos, TOOLTIP_GLYPH_SCALE_X, TOOLTIP_GLYPH_SCALE_Y));
 
 			if (ms != MapleStat::Id::LEVEL)
-				reqset[reqok].draw(reqstatstrings[ms], 6, pos + reqpos + Point<int16_t>(54, 0));
+				reqset[reqok].draw(reqstatstrings[ms], TOOLTIP_GLYPH_SPACING,
+					DrawArgument(pos + reqpos + Point<int16_t>(62, 0), TOOLTIP_GLYPH_SCALE_X, TOOLTIP_GLYPH_SCALE_Y));
 			else
-				lvset[reqok].draw(reqstatstrings[ms], 6, pos + reqpos + Point<int16_t>(54, 0));
+				lvset[reqok].draw(reqstatstrings[ms], TOOLTIP_GLYPH_SPACING,
+					DrawArgument(pos + reqpos + Point<int16_t>(62, 0), TOOLTIP_GLYPH_SCALE_X, TOOLTIP_GLYPH_SCALE_Y));
 		}
 
 		pos.shift_y(88);
@@ -782,7 +796,8 @@ namespace ms
 			atkinc_pos = false;
 		}
 
-		atkincset[atkinc_pos].draw(atkincstr, 11, pos + Point<int16_t>(239, 26));
+		atkincset[atkinc_pos].draw(atkincstr, 13,
+			DrawArgument(pos + Point<int16_t>(239, 26), TOOLTIP_GLYPH_SCALE_X, TOOLTIP_GLYPH_SCALE_Y));
 
 		pos.shift_y(12);
 
@@ -790,12 +805,15 @@ namespace ms
 		{
 			Point<int16_t> reqpos = reqstatpositions[ms];
 			bool reqok = canequip_preview[ms];
-			reqstattextures[ms][reqok].draw(pos + reqpos);
+			reqstattextures[ms][reqok].draw(
+				DrawArgument(pos + reqpos, TOOLTIP_GLYPH_SCALE_X, TOOLTIP_GLYPH_SCALE_Y));
 
 			if (ms != MapleStat::Id::LEVEL)
-				reqset[reqok].draw(reqstatstrings_preview[ms], 6, pos + reqpos + Point<int16_t>(54, 0));
+				reqset[reqok].draw(reqstatstrings_preview[ms], TOOLTIP_GLYPH_SPACING,
+					DrawArgument(pos + reqpos + Point<int16_t>(62, 0), TOOLTIP_GLYPH_SCALE_X, TOOLTIP_GLYPH_SCALE_Y));
 			else
-				lvset[reqok].draw(reqstatstrings_preview[ms], 6, pos + reqpos + Point<int16_t>(54, 0));
+				lvset[reqok].draw(reqstatstrings_preview[ms], TOOLTIP_GLYPH_SPACING,
+					DrawArgument(pos + reqpos + Point<int16_t>(62, 0), TOOLTIP_GLYPH_SCALE_X, TOOLTIP_GLYPH_SCALE_Y));
 		}
 
 		pos.shift_y(88);

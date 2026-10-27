@@ -356,6 +356,16 @@ namespace ms
 		if (state != State::ACTIVE || !playable)
 			return;
 
+		// NPC Chat is the v83 interaction binding (keymap action 54). It is a
+		// client-side action; forwarding it as a player movement action does
+		// nothing, so start a conversation with the nearest nearby NPC here.
+		if (type == KeyType::Id::ACTION && action == KeyAction::Id::NPC_CHAT)
+		{
+			if (down)
+				npcs.interact_nearby(player.get_position());
+			return;
+		}
+
 		switch (type)
 		{
 			case KeyType::Id::ACTION:

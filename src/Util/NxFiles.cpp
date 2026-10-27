@@ -68,12 +68,12 @@ namespace ms
 	{
 		namespace
 		{
-			std::unique_ptr<nl::file> legacy_ui;
+			std::unique_ptr<nl::file> ui_file;
 		}
 
 		nl::node login_ui()
 		{
-			return legacy_ui->root()["Login.img"];
+			return ui_file->root()["Login.img"];
 		}
 
 		Error init()
@@ -93,10 +93,10 @@ namespace ms
 
 			try
 			{
-				// Open the legacy login assets here, while startup can still report
-				// an asset error cleanly. Opening this lazily while constructing the
-				// first UI screen would let an exception abort the whole process.
-				legacy_ui = std::make_unique<nl::file>("UI-v83.nx");
+				// Open login assets here, while startup can still report an asset
+				// error cleanly. Opening this lazily while constructing the first UI
+				// screen would let an exception abort the whole process.
+				ui_file = std::make_unique<nl::file>("UI.nx");
 				nl::nx::load_all();
 			}
 			catch (const std::exception& ex)

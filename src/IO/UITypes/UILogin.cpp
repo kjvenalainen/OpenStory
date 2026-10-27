@@ -219,6 +219,14 @@ namespace ms
 			password_text = Configuration::get().get_auto_pass();
 		}
 
+		// Save the login ID as soon as the user submits it. A missing or short
+		// password should not make the checked "Save login ID" option forget it.
+		if (saveid && !account_text.empty())
+		{
+			Setting<DefaultAccount>::get().save(account_text);
+			Configuration::get().save();
+		}
+
 		std::function<void()> okhandler = [&, password_text]()
 		{
 			account.set_state(Textfield::State::NORMAL);
@@ -244,7 +252,6 @@ namespace ms
 
 		if (saveid)
 		{
-			Setting<DefaultAccount>::get().save(account_text);
 			Setting<DefaultPassword>::get().save(password_text);
 			Configuration::get().save();
 		}

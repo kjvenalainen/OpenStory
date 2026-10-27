@@ -51,6 +51,8 @@ namespace ms
 
 		// Send mouse input to clickable NPCs
 		Cursor::State send_cursor(bool pressed, Point<int16_t> position, Point<int16_t> viewpos);
+		// Start a conversation with the closest NPC near the player's feet.
+		bool interact_nearby(Point<int16_t> player_position);
 
 	private:
 		MapObjects npcs;

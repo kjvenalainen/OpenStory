@@ -23,6 +23,8 @@
 #include "../../Net/Packets/NpcInteractionPackets.h"
 #include "../../IO/UI.h"
 
+#include <cstdlib>
+
 namespace ms
 {
 	void MapNpcs::draw(Layer::Id layer, double viewx, double viewy, float alpha) const
@@ -106,6 +108,44 @@ namespace ms
 			if (npc && npc->is_active())
 				npc->update_quest_mark();
 		}
+	}
+
+	bool MapNpcs::interact_nearby(Point<int16_t> player_position)
+	{
+		// NPC sprites can be tall, so use feet-to-feet distance instead of the
+		// sprite hitbox. This mirrors the range in which NPC Chat is useful.
+		constexpr int16_t MAX_X_DISTANCE = 100;
+		constexpr int16_t MAX_Y_DISTANCE = 60;
+		Npc* closest = nullptr;
+		int32_t closest_distance = MAX_X_DISTANCE * MAX_X_DISTANCE
+			+ MAX_Y_DISTANCE * MAX_Y_DISTANCE + 1;
+
+		for (auto& map_object : npcs)
+		{
+			Npc* npc = static_cast<Npc*>(map_object.second.get());
+			if (!npc || !npc->is_active())
+				continue;
+
+			int32_t dx = std::abs(static_cast<int32_t>(npc->get_position().x()) - player_position.x());
+			int32_t dy = std::abs(static_cast<int32_t>(npc->get_position().y()) - player_position.y());
+			if (dx > MAX_X_DISTANCE || dy > MAX_Y_DISTANCE)
+				continue;
+
+			int32_t distance = dx * dx + dy * dy;
+			if (distance < closest_distance)
+			{
+				closest = npc;
+				closest_distance = distance;
+			}
+		}
+
+		if (!closest || !NpcResponseTracker::get().can_click_now())
+			return false;
+
+		NpcResponseTracker::get().mark_clicked_now();
+		NpcResponseTracker::get().mark_pending(closest->get_npcid());
+		TalkToNPCPacket(closest->get_oid()).dispatch();
+		return true;
 	}
 
 	Cursor::State MapNpcs::send_cursor(bool pressed, Point<int16_t> position, Point<int16_t> viewpos)

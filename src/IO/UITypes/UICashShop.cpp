@@ -1,17 +1,17 @@
 //////////////////////////////////////////////////////////////////////////////////
 //	This file is part of the continued Journey MMORPG client					//
 //	Copyright (C) 2015-2019  Daniel Allendorf, Ryan Payton						//
-//																				//
+//																//
 //	This program is free software: you can redistribute it and/or modify		//
-//	it under the terms of the GNU Affero General Public License as published by	//
+//	it under the terms of the GNU Affero General Public License as published by//
 //	the Free Software Foundation, either version 3 of the License, or			//
 //	(at your option) any later version.											//
-//																				//
+//																//
 //	This program is distributed in the hope that it will be useful,				//
 //	but WITHOUT ANY WARRANTY; without even the implied warranty of				//
 //	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the				//
 //	GNU Affero General Public License for more details.							//
-//																				//
+//																//
 //	You should have received a copy of the GNU Affero General Public License	//
 //	along with this program.  If not, see <https://www.gnu.org/licenses/>.		//
 //////////////////////////////////////////////////////////////////////////////////
@@ -20,16 +20,22 @@
 #include "../KeyAction.h"
 #include "../UI.h"
 #include "../Window.h"
+#include "UIChatBar.h"
 
 #include "../Components/MapleButton.h"
 
 #include "../../Constants.h"
+#include "../../Configuration.h"
 #include "../../Gameplay/Stage.h"
 
 #include "../../Net/Handlers/CashShopHandlers.h"
 #include "../../Net/Packets/CashShopPackets.h"
 #include "../../Net/Packets/GameplayPackets.h"
 #include "../../Net/Packets/LoginPackets.h"
+#include "../../Util/Misc.h"
+
+#include <algorithm>
+#include <cstdlib>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -41,308 +47,327 @@
 
 namespace ms
 {
-	UICashShop::UICashShop() : preview_index(0), menu_index(1), promotion_index(0), mvp_grade(1), mvp_exp(0.07f), list_offset(0)
+	UICashShop::UICashShop()
+		: page(0), selected_item(-1), category(ALL_ITEMS),
+		  category_active_bg(144, 24, Color::Name::MALIBU, 0.24f),
+		  category_hover_bg(144, 24, Color::Name::LIGHTGREY, 0.16f),
+		  card_selected_bg(CARD_W, CARD_H, Color::Name::MALIBU, 0.15f),
+		  coupon_shade(1024, 768, Color::Name::BLACK, 0.64f),
+		  char_x(888.0f), char_yoff(0.0f), char_vy(0.0f), char_jumping(false),
+		  facing_right(true), exit_pending(false),
+		  tooltip_item_id(0),
+		  return_mapid(Stage::get().get_player().get_stats().get_mapid()),
+		  return_portalid(Stage::get().get_player().get_stats().get_portal()),
+		  cur_stance(Stance::Id::STAND1), overlay(OVERLAY_NONE)
 	{
-		// Primary English cash-shop sprites live in CashShopGL.img. A few
-		// elements (item search/effect/char/list) don't have CashShopGL
-		// equivalents, so they fall back to CashShop.img's Korean nodes.
-		nl::node CashShop = nl::nx::ui["CashShop.img"];
-		nl::node CashShopGL = nl::nx::ui["CashShopGL.img"];
+		const nl::node cash_shop_gl = nl::nx::ui["CashShopGL.img"];
+		const nl::node base_frame = cash_shop_gl["BaseFrame"];
+		const nl::node main_menu = cash_shop_gl["MainMenu"];
+		const nl::node main_item = main_menu["MainItem"];
 
-		nl::node Base = CashShop["Base"];
-		nl::node BaseFrame = CashShopGL["BaseFrame"];
-		nl::node backgrnd = BaseFrame["background"];
-		nl::node Preview = Base["Preview"];
-		nl::node CSItemSearch = BaseFrame["CSItemSearch"];
-		nl::node CSList = CashShop["CSList"];
-		nl::node MainItem = CashShopGL["MainMenu"]["MainItem"];
-		nl::node Popup = CashShopGL["Popup"];
-
-		sprites.emplace_back(backgrnd);
-
-		// BestNew banner has Korean text baked in — omit. Leave dimensions
-		// zeroed out (item_none fallback still works).
-		BestNew_dim = Point<int16_t>();
-
-		for (size_t i = 0; i < 3; i++)
-		{
-			preview_sprites[i] = Preview[i];
-			preview_scene[i] = Texture(Preview[i]);
-		}
-
-		for (size_t i = 0; i < 3; i++)
-			buttons[Buttons::BtPreview1 + i] = std::make_unique<TwoSpriteButton>(Base["Tab"]["Disable"][i], Base["Tab"]["Enable"][i], Point<int16_t>(957 + (i * 17), 46));
-
-		buttons[Buttons::BtPreview1]->set_state(Button::State::PRESSED);
-
-		// English header/exit buttons from CashShopGL/BaseFrame.
-		// The bitmaps carry absolute 1024x768 positions via negative origin
-		// vectors (e.g. BtExit origin = (-962,-10) → draws at (962,10)), so
-		// pass Point(0,0) and let the origin place them on the canvas.
-		buttons[Buttons::BtExit] = std::make_unique<MapleButton>(BaseFrame["BtExit"]);
-		buttons[Buttons::BtHelp] = std::make_unique<MapleButton>(BaseFrame["BtHelp"]);
-		buttons[Buttons::BtCoupon] = std::make_unique<MapleButton>(BaseFrame["BtCoupon"]);
-
-		// Korean-only elements (CSTab/Tab menu banners, CSStatus/BtMileage,
-		// CSPromotionBanner, CSChar avatar buttons, CSMVPBanner) are
-		// deliberately not instantiated — there are no equivalents in
-		// CashShopGL.img that match this layout 1:1. (CSStatus/BtWish and
-		// CSChar/BtInventory are the exception: they toggle the wishlist /
-		// cash inventory sub-panels and have no English counterpart, so the
-		// Korean buttons are instantiated further below.)
-
-		Player& player = Stage::get().get_player();
-		std::string pname = player.get_stats().get_name();
-		std::string pjob = player.get_stats().get_jobname();
-
-		job_label = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::SUPERNOVA, pjob);
-		name_label = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::WHITE, pname);
-
-		promotion_pos = Point<int16_t>();
-		mvp_pos = Point<int16_t>();
-
-		// English search bar under BaseFrame/CSItemSearch.
-		sprites.emplace_back(CSItemSearch["background"]);
-
-		// Charge NX numeric charset — fall back to CashShop/Base/Number.
-		charge_charset = Charset(Base["Number"], Charset::Alignment::RIGHT);
-
-		item_base = CSList["Base"];
-		item_line = Base["line"];
-		item_none = Base["noItem"];
-		// Korean CSEffect labels omitted; item_labels stays empty so no
-		// HOT/NEW/SALE sticker draws with Korean text.
-
-		// The real catalog from Etc/Commodity.img — the same data Cosmic's
-		// CashItemFactory sells from, so the SNs and NX prices match the
-		// server exactly. Only OnSale entries are listed.
+		// Use the same server commodity table as the purchase packet, so every
+		// card shown here has a real SN and the price the server expects.
 		for (nl::node entry : nl::nx::etc["Commodity.img"])
 		{
-			int32_t onsale = entry["OnSale"];
-
-			if (onsale != 1)
+			if (static_cast<int32_t>(entry["OnSale"]) != 1)
 				continue;
 
-			int32_t itemid = entry["ItemId"];
-
-			if (!ItemData::get(itemid).is_valid())
+			const int32_t item_id = entry["ItemId"];
+			if (!ItemData::get(item_id).is_valid())
 				continue;
 
-			int32_t sn = entry["SN"];
-			int32_t price = entry["Price"];
-			int32_t count = entry["Count"];
-
-			items.push_back(Item(itemid, sn, Item::Label::NONE, price, static_cast<uint16_t>(count)));
+			items.emplace_back(item_id, static_cast<int32_t>(entry["SN"]),
+				static_cast<int32_t>(entry["Price"]), static_cast<uint16_t>(entry["Count"]));
 		}
 
-		for (size_t i = 0; i < MAX_ITEMS; i++)
+		// The English full-screen background already includes the three right
+		// inventory panels and the NX balance labels. The catalog gets its own
+		// framed work area, kept inside the 596px center column.
+		sprites.emplace_back(base_frame["background"]);
+		catalog_frame = Sprite(main_menu["Home"]["background"], DrawArgument(Point<int16_t>(170, 31)));
+		item_base = Texture(main_item["background"]);
+		search_bg = Texture(base_frame["CSItemSearch"]["background"]);
+
+		// The title bar artwork uses negative origins to place controls at their
+		// authored 1024x768 coordinates. Keeping the default button position lets
+		// those origins do the positioning.
+		buttons[BtExit] = std::make_unique<MapleButton>(base_frame["BtExit"]);
+		buttons[BtHelp] = std::make_unique<MapleButton>(base_frame["BtHelp"]);
+		buttons[BtCoupon] = std::make_unique<MapleButton>(base_frame["BtCoupon"]);
+		// The search button's negative origin places it at its authored
+		// header coordinate. The charge button's positive layout position
+		// compensates for its -85px vertical origin and keeps it above balances.
+		buttons[BtSearch] = std::make_unique<MapleButton>(base_frame["CSItemSearch"]["BtGo"]);
+		buttons[BtChargeNX] = std::make_unique<MapleButton>(cash_shop_gl["LeftMenu"]["MyMenu"]["BtChageNx"], Point<int16_t>(27, 525));
+
+		const std::string categories[CATEGORY_COUNT] =
 		{
-			div_t div = std::div(i, GRID_COLS);
+			"All items", "Equipment", "Use", "Set-up", "Etc.", "Cash",
+			"Pet", "Pet Equips", "Pet Misc"
+		};
+		for (uint8_t i = 0; i < CATEGORY_COUNT; i++)
+			category_labels[i] = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::MINESHAFT, categories[i]);
 
-			// The GL BUY bitmap carries origin (-81, -54); this lands it
-			// at the classic card's bottom strip (in-card 9,151)
-			buttons[Buttons::BtBuy + i] = std::make_unique<MapleButton>(MainItem["BtBuy"], Point<int16_t>(GRID_X + STRIDE_X * div.rem - 72, GRID_Y + STRIDE_Y * div.quot + 97));
+		for (size_t i = 0; i < PAGE_SIZE; i++)
+		{
+			const div_t cell = std::div(static_cast<int>(i), GRID_COLS);
+			const Point<int16_t> card_pos(
+				GRID_X + STRIDE_X * cell.rem,
+				GRID_Y + STRIDE_Y * cell.quot);
 
-			item_name[i] = Text(Text::Font::A11B, Text::Alignment::CENTER, Color::Name::MINESHAFT);
-			item_price[i] = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::GRAY);
-			item_discount[i] = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::SILVERCHALICE);
-			item_percent[i] = Text(Text::Font::A11M, Text::Alignment::CENTER, Color::Name::TORCHRED);
+			buttons[BtBuy + i] = std::make_unique<MapleButton>(main_item["BtBuy"],
+				card_pos + Point<int16_t>(7, 39));
+			item_name[i] = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::MINESHAFT, "", 98);
+			item_price[i] = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::ENDEAVOUR, "", 98);
+			item_count[i] = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY, "", 98);
 		}
 
-		Point<int16_t> slider_pos = Point<int16_t>(770, GRID_Y);
+		search_field = Textfield(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::MINESHAFT,
+			Rectangle<int16_t>(Point<int16_t>(483, 9), Point<int16_t>(674, 23)), 40);
+		search_field.set_enter_callback([this](std::string query)
+		{
+			applied_search = query;
+			rebuild_filter();
+		});
+		search_field.set_key_callback(KeyAction::Id::ESCAPE, [this]()
+		{
+			UI::get().remove_textfield();
+			search_field.set_state(Textfield::State::NORMAL);
+		});
+
+		const nl::node popup = cash_shop_gl["Popup"];
+		coupon_bg = Texture(popup["Cupon"]["background"]);
+		help_bg = Texture(cash_shop_gl["PicturePlate"]["HowTo"]);
+		buttons[BtCouponSubmit] = std::make_unique<MapleButton>(popup["Cupon"]["BtOk"], Point<int16_t>(453, 397));
+		buttons[BtCouponCancel] = std::make_unique<MapleButton>(popup["Cupon"]["BtCancel"], Point<int16_t>(515, 397));
+		buttons[BtHelpClose] = std::make_unique<MapleButton>(cash_shop_gl["PicturePlate"]["BtClose"], Point<int16_t>(714, 192));
+		buttons[BtCouponSubmit]->set_active(false);
+		buttons[BtCouponCancel]->set_active(false);
+		buttons[BtHelpClose]->set_active(false);
+
+		coupon_field = Textfield(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::MINESHAFT,
+			Rectangle<int16_t>(Point<int16_t>(386, 378), Point<int16_t>(638, 392)), 64);
+		coupon_field.set_enter_callback([this](std::string code)
+		{
+			if (!code.empty())
+				CouponCodePacket(code).dispatch();
+			close_overlay();
+		});
+		coupon_field.set_key_callback(KeyAction::Id::ESCAPE, [this]() { close_overlay(); });
+
+		for (int i = 0; i < 3; i++)
+			cash_balance_text[i] = Text(Text::Font::A11B, Text::Alignment::RIGHT, Color::Name::MINESHAFT);
+
+		player_name = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::MINESHAFT,
+			Stage::get().get_player().get_stats().get_name(), 140);
+		job_name = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY,
+			Stage::get().get_player().get_stats().get_jobname(), 140);
+		selected_name = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::MINESHAFT, "", 145);
+		selected_price = Text(Text::Font::A11B, Text::Alignment::RIGHT, Color::Name::ENDEAVOUR, "", 82);
+		result_summary = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY);
+		empty_message = Text(Text::Font::A12B, Text::Alignment::CENTER, Color::Name::DUSTYGRAY,
+			"No items match your search.", 360);
+
+		preview_look = Stage::get().get_player().get_look();
+		preview_look.set_stance(Stance::Id::STAND1);
 
 		list_slider = Slider(
 			Slider::Type::THIN_MINESHAFT,
-			Range<int16_t>(slider_pos.y(), slider_pos.y() + GRID_ROWS * STRIDE_Y - 30),
-			slider_pos.x(),
-			GRID_ROWS,
-			static_cast<int16_t>(items.size() / GRID_COLS + 1),
-			[&](bool upwards)
+			Range<int16_t>(GRID_Y + 8, GRID_Y + (GRID_ROWS - 1) * STRIDE_Y + CARD_H - 12),
+			755,
+			1,
+			1,
+			[this](bool upwards)
 			{
-				int16_t shift = upwards ? -GRID_COLS : GRID_COLS;
-				bool above = list_offset >= 0;
-				bool below = list_offset + shift < items.size();
-
-				if (above && below)
+				const int32_t page_count = static_cast<int32_t>((visible_items.size() + PAGE_SIZE - 1) / PAGE_SIZE);
+				const int32_t next_page = page + (upwards ? -1 : 1);
+				if (next_page >= 0 && next_page < page_count)
 				{
-					list_offset += shift;
-
+					page = static_cast<int16_t>(next_page);
 					update_items();
 				}
-			}
-		);
+			});
 
-		update_items();
-
-		// === Sub-panel backgrounds (English — CashShopGL/Popup) ===
-		// Popup/Gift/background and Popup/Cupon/background are the English
-		// popup chrome (the nodes are named "background", not "backgrnd").
-		// Popup/Buy has no single background bitmap (it is composed of
-		// Top/Middle/Bottom strips), so purchase_bg stays empty and its
-		// draw call remains guarded by is_valid().
-		gift_bg = Texture(Popup["Gift"]["background"]);
-		coupon_bg = Texture(Popup["Cupon"]["background"]);
-
-		// Wishlist ("CART INVENTORY") and cash inventory ("CASH INVENTORY")
-		// use the English right-side menu panels — 242px wide with a 6x2
-		// grid of 32x32 item slots at (8 + 36 * col, 28 + 35 * row).
-		nl::node RightMenu = CashShopGL["RightMenu"];
-		wishlist_bg = Texture(RightMenu["CartInven"]["background"]);
-		cs_inventory_bg = Texture(RightMenu["CashInven"]["background"]);
-
-		// No wishlist/inventory toggle buttons: the cash inventory renders
-		// permanently into its baked right-column panel, and the wishlist
-		// has no English art (its data is never parsed client-side).
-
-		// Charge NX under the baked NX-balance panel at (9,646); the
-		// button bitmap's origin drops it just below the panel
-		buttons[Buttons::BtChargeNX] = std::make_unique<MapleButton>(CashShopGL["LeftMenu"]["MyMenu"]["BtChageNx"], Point<int16_t>(10, 646));
-
-		for (int i = 0; i < 3; i++)
-			cash_balance_text[i] = Text(Text::Font::A11B, Text::Alignment::RIGHT, Color::Name::EMPEROR);
-
-		selected_item = -1;
-		preview_name = Text(Text::Font::A12B, Text::Alignment::LEFT, Color::Name::WHITE, "", 220);
-		preview_desc = Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::WHITE, "", 220);
-		preview_price = Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::SUPERNOVA);
-
-		// Your character lives on the preview stage; selecting an equip
-		// dresses it, arrow keys walk it, jump key jumps
-		preview_look = player.get_look();
-		preview_look.set_stance(Stance::Id::STAND1);
-		cur_stance = Stance::Id::STAND1;
-
-		active_subpanel = SUBPANEL_NONE;
-
-		dimension = Texture(backgrnd).get_dimensions();
+		dimension = Point<int16_t>(1024, 768);
+		applied_search.clear();
+		rebuild_filter();
 	}
 
 	void UICashShop::draw(float inter) const
 	{
-		// The preview stage stretches to the window top
-		preview_scene[preview_index].draw(DrawArgument(position + Point<int16_t>(644, 40), Point<int16_t>(366, 310)));
-
 		UIElement::draw_sprites(inter);
+		catalog_frame.draw(position, inter);
 
-		// Korean menu_tabs / promotion_sprites / mvp_sprites / charge_charset
-		// draws removed — those elements have no English equivalent.
+		// Catalog search bar and its input sit in the fixed header strip.
+		search_bg.draw(DrawArgument(position));
+		search_field.draw(position);
+		if (search_field.empty() && search_field.get_state() != Textfield::State::FOCUSED)
+			Text(Text::Font::A11M, Text::Alignment::LEFT, Color::Name::DUSTYGRAY, "Search items", 170).draw(position + Point<int16_t>(485, 9));
 
-		// NX balances beside the baked labels: NX Prepaid / NX Credit /
-		// Maple Pts (query result order: credit, points, prepaid)
-		cash_balance_text[0].change_text(std::to_string(get_cash_balance(2)));
-		cash_balance_text[1].change_text(std::to_string(get_cash_balance(0)));
-		cash_balance_text[2].change_text(std::to_string(get_cash_balance(1)));
+		Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::WHITE, "MAPLE CASH SHOP").draw(position + Point<int16_t>(178, 10));
+		Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::MINESHAFT, "ITEM CATALOG").draw(position + Point<int16_t>(183, 38));
 
-		for (int b = 0; b < 3; b++)
-			cash_balance_text[b].draw(position + Point<int16_t>(152, 653 + 26 * b));
+		player_name.draw(position + Point<int16_t>(16, 42));
+		job_name.draw(position + Point<int16_t>(16, 58));
+		Text(Text::Font::A11B, Text::Alignment::LEFT, Color::Name::DUSTYGRAY, "Browse categories").draw(position + Point<int16_t>(16, 82));
 
-		Point<int16_t> label_pos = position + Point<int16_t>(4, 3);
-		job_label.draw(label_pos);
-
-		size_t length = job_label.width();
-		name_label.draw(label_pos + Point<int16_t>(length + 10, 0));
-
-		if (items.empty())
-			item_none.draw(position + Point<int16_t>(430, 360) - item_none.get_dimensions() / 2, inter);
-
-		for (size_t i = 0; i < MAX_ITEMS; i++)
+		for (uint8_t i = 0; i < CATEGORY_COUNT; i++)
 		{
-			int16_t index = i + list_offset;
-
-			if (index < items.size())
-			{
-				div_t div = std::div(i, GRID_COLS);
-				Point<int16_t> cell = position + Point<int16_t>(GRID_X + STRIDE_X * div.rem, GRID_Y + STRIDE_Y * div.quot);
-				Item item = items[index];
-
-				item_base.draw(cell, inter);
-				// Icon centered in the card's upper frame; v83 icons carry
-				// a (0,32) origin which doubles at 2x scale
-				item.draw(DrawArgument(cell + Point<int16_t>(27, 101), 2.0f, 2.0f));
-
-				item_name[i].draw(cell + Point<int16_t>(55, 108));
-				item_price[i].draw(cell + Point<int16_t>(58, 127));
-			}
+			const Point<int16_t> tab_pos(12, 100 + 32 * i);
+			const Rectangle<int16_t> tab_bounds(tab_pos, tab_pos + Point<int16_t>(144, 24));
+			if (tab_bounds.contains(UI::get().get_cursor_position() - position))
+				category_hover_bg.draw(DrawArgument(position + tab_pos));
+			if (i == category)
+				category_active_bg.draw(DrawArgument(position + tab_pos));
+			category_labels[i].draw(position + tab_pos + Point<int16_t>(12, 6));
 		}
 
-		// Your character on the stage, dressed with whatever is selected
-		preview_look.draw(
-			DrawArgument(position + Point<int16_t>(static_cast<int16_t>(char_x), static_cast<int16_t>(275.0f + char_yoff)), !facing_right),
-			inter);
+		if (visible_items.empty())
+		{
+			empty_message.draw(position + Point<int16_t>(458, 365));
+			result_summary.change_text("0 matching items");
+		}
+		else
+		{
+			for (size_t i = 0; i < PAGE_SIZE; i++)
+			{
+				const size_t visible_index = static_cast<size_t>(page) * PAGE_SIZE + i;
+				if (visible_index >= visible_items.size())
+					continue;
+
+				const int16_t item_index = static_cast<int16_t>(visible_items[visible_index]);
+				const Item& item = items[item_index];
+				const div_t cell = std::div(static_cast<int>(i), GRID_COLS);
+				const Point<int16_t> card_pos(
+					GRID_X + STRIDE_X * cell.rem,
+					GRID_Y + STRIDE_Y * cell.quot);
+
+				item_base.draw(DrawArgument(position + card_pos));
+				if (item_index == selected_item)
+					card_selected_bg.draw(DrawArgument(position + card_pos));
+
+				// The 64px icon is centered in the framed preview square on each
+				// English product tile. Cash item icons use a 32px source origin.
+				item.draw(DrawArgument(position + card_pos + Point<int16_t>(10, 118), 2.0f, 2.0f));
+				item_name[i].draw(position + card_pos + Point<int16_t>(81, 16));
+				item_price[i].draw(position + card_pos + Point<int16_t>(81, 49));
+				item_count[i].draw(position + card_pos + Point<int16_t>(81, 68));
+			}
+
+			const size_t first = static_cast<size_t>(page) * PAGE_SIZE + 1;
+			const size_t last = std::min(visible_items.size(), static_cast<size_t>(page + 1) * PAGE_SIZE);
+			result_summary.change_text("Showing " + std::to_string(first) + "-" + std::to_string(last)
+				+ " of " + std::to_string(visible_items.size()) + " items");
+		}
+
+		result_summary.draw(position + Point<int16_t>(183,
+			GRID_Y + (GRID_ROWS - 1) * STRIDE_Y + CARD_H + 8));
+		list_slider.draw(position);
+
+		// Keep the stage character inside the baked preview window. Arrow keys
+		// move the selection through the catalog and update this preview.
+		preview_look.draw(DrawArgument(position + Point<int16_t>(static_cast<int16_t>(char_x),
+			static_cast<int16_t>(330.0f + char_yoff)), !facing_right), inter);
 
 		if (selected_item >= 0 && selected_item < static_cast<int16_t>(items.size()))
 		{
-			const Item& sel = items[selected_item];
-			Point<int16_t> pv = position + Point<int16_t>(652, 46);
-
-			preview_name.change_text(sel.get_name());
-			preview_name.draw(pv);
-
-			std::string pricestr = std::to_string(sel.get_price()) + " NX";
-
-			if (sel.count > 1)
-				pricestr += " (" + std::to_string(sel.count) + ")";
-
-			preview_price.change_text(pricestr);
-			preview_price.draw(pv + Point<int16_t>(0, 16));
+			const Item& item = items[selected_item];
+			selected_name.change_text(item.get_name());
+			string_format::format_with_ellipsis(selected_name, 145);
+			std::string price = std::to_string(item.price);
+			string_format::split_number(price);
+			selected_price.change_text(price + " NX");
+			selected_name.draw(position + Point<int16_t>(779, 344));
+			selected_price.draw(position + Point<int16_t>(997, 344));
+		}
+		else
+		{
+			selected_name.change_text("Select an item to preview");
+			selected_price.change_text("");
+			string_format::format_with_ellipsis(selected_name, 145);
+			selected_name.draw(position + Point<int16_t>(779, 344));
 		}
 
-		list_slider.draw(position);
+		// NX labels are baked into the full-screen background in this order:
+		// prepaid, credit, Maple Points. The response is credit, points, prepaid.
+		std::string prepaid = std::to_string(get_cash_balance(2));
+		std::string credit = std::to_string(get_cash_balance(0));
+		std::string maple_points = std::to_string(get_cash_balance(1));
+		string_format::split_number(prepaid);
+		string_format::split_number(credit);
+		string_format::split_number(maple_points);
+		cash_balance_text[0].change_text(prepaid);
+		cash_balance_text[1].change_text(credit);
+		cash_balance_text[2].change_text(maple_points);
+		for (int i = 0; i < 3; i++)
+			cash_balance_text[i].draw(position + Point<int16_t>(159, 670 + 25 * i));
+
+		// The middle right panel is the server-side cash shop locker. It is
+		// separate from the character's CASH inventory and is refreshed by the
+		// server whenever the shop opens.
+		const std::vector<CashShopItemEntry>& locker = get_cash_shop_items();
+		for (size_t i = 0; i < locker.size() && i < 14; i++)
+		{
+			const int32_t item_id = locker[i].item_id;
+			if (item_id == 0 || !ItemData::get(item_id).is_valid())
+				continue;
+
+			const div_t cell = std::div(static_cast<int>(i), 7);
+			const Point<int16_t> slot_pos(777 + 34 * cell.rem, 514 + 34 * cell.quot);
+			ItemData::get(item_id).get_icon(false).draw(DrawArgument(position + slot_pos + Point<int16_t>(0, 32)));
+		}
 
 		UIElement::draw_buttons(inter);
 
-		// Draw active sub-panel (English popups only).
-		switch (active_subpanel)
+		if (overlay != OVERLAY_NONE)
 		{
-		case SUBPANEL_GIFT:
-			if (gift_bg.is_valid())
-				gift_bg.draw(DrawArgument(position + Point<int16_t>(200, 50)));
-			break;
-		case SUBPANEL_COUPON:
-			if (coupon_bg.is_valid())
-				coupon_bg.draw(DrawArgument(position + Point<int16_t>(200, 50)));
-			break;
-		case SUBPANEL_PURCHASE:
-			if (purchase_bg.is_valid())
-				purchase_bg.draw(DrawArgument(position + Point<int16_t>(200, 50)));
-			break;
-		default:
-			break;
-		}
-
-		// Player's cash items rendered into the baked CASH INVENTORY
-		// panel in the right column (7x2 slot grid)
-		const Inventory& inventory = Stage::get().get_player().get_inventory();
-		uint8_t slotmax = inventory.get_slotmax(InventoryType::Id::CASH);
-		int16_t shown = 0;
-
-		for (int16_t slot = 1; slot <= slotmax && shown < 14; slot++)
-		{
-			int32_t item_id = inventory.get_item_id(InventoryType::Id::CASH, slot);
-
-			if (item_id == 0)
-				continue;
-
-			div_t sdiv = std::div(shown, 7);
-			Point<int16_t> slot_pos = position + Point<int16_t>(771 + 34 * sdiv.rem, 513 + 34 * sdiv.quot);
-
-			// v83 item icons carry a (0, 32) origin, so draw at the
-			// slot's bottom edge to land the 32x32 icon inside it.
-			ItemData::get(item_id).get_icon(false).draw(DrawArgument(slot_pos + Point<int16_t>(0, 32)));
-
-			shown++;
+			coupon_shade.draw(DrawArgument(position));
+			if (overlay == OVERLAY_COUPON)
+			{
+				coupon_bg.draw(DrawArgument(position + Point<int16_t>(374, 352)));
+				coupon_field.draw(position);
+				buttons.at(BtCouponSubmit)->draw(position);
+				buttons.at(BtCouponCancel)->draw(position);
+			}
+			else
+			{
+				help_bg.draw(DrawArgument(position + Point<int16_t>(224, 184)));
+				buttons.at(BtHelpClose)->draw(position);
+			}
 		}
 	}
 
 	void UICashShop::send_key(int32_t keycode, bool pressed, bool escape)
 	{
+		if (pressed && escape)
+		{
+			if (overlay != OVERLAY_NONE)
+				close_overlay();
+			else
+				schedule_exit();
+			return;
+		}
+
+		if (overlay != OVERLAY_NONE)
+			return;
+
 		switch (keycode)
 		{
 		case KeyAction::Id::LEFT:
-			key_left = pressed;
+			if (pressed)
+				navigate_items(-1);
 			break;
 		case KeyAction::Id::RIGHT:
-			key_right = pressed;
+			if (pressed)
+				navigate_items(1);
+			break;
+		case KeyAction::Id::UP:
+			if (pressed)
+				navigate_items(-GRID_COLS);
+			break;
+		case KeyAction::Id::DOWN:
+			if (pressed)
+				navigate_items(GRID_COLS);
 			break;
 		case KeyAction::Id::JUMP:
 			if (pressed && !char_jumping)
@@ -359,36 +384,23 @@ namespace ms
 	void UICashShop::update()
 	{
 		UIElement::update();
+		search_field.update(position);
+		if (overlay == OVERLAY_COUPON)
+			coupon_field.update(position);
+
+		const std::string query = search_field.get_text();
+		if (query != applied_search)
+		{
+			applied_search = query;
+			rebuild_filter();
+		}
 
 		preview_look.update(Constants::TIMESTEP);
 
-		// Walk
-		float dx = 0.0f;
-
-		if (key_left)
-			dx -= 1.3f;
-
-		if (key_right)
-			dx += 1.3f;
-
-		if (dx != 0.0f)
-		{
-			char_x += dx;
-			facing_right = dx > 0.0f;
-
-			if (char_x < 662.0f)
-				char_x = 662.0f;
-
-			if (char_x > 992.0f)
-				char_x = 992.0f;
-		}
-
-		// Jump arc
 		if (char_jumping)
 		{
 			char_yoff += char_vy;
 			char_vy += 0.28f;
-
 			if (char_yoff >= 0.0f)
 			{
 				char_yoff = 0.0f;
@@ -397,155 +409,186 @@ namespace ms
 			}
 		}
 
-		// Stance follows the movement state
-		uint8_t want = char_jumping ? Stance::Id::JUMP
-			: (dx != 0.0f) ? Stance::Id::WALK1
-			: Stance::Id::STAND1;
-
+		const uint8_t want = char_jumping ? Stance::Id::JUMP : Stance::Id::STAND1;
 		if (want != cur_stance)
 		{
 			cur_stance = want;
 			preview_look.set_stance(static_cast<Stance::Id>(cur_stance));
 		}
+
+		update_tooltip(UI::get().get_cursor_position());
+	}
+
+	void UICashShop::send_scroll(double yoffset)
+	{
+		if (overlay == OVERLAY_NONE && list_slider.isenabled())
+			list_slider.send_scroll(yoffset);
 	}
 
 	Button::State UICashShop::button_pressed(uint16_t buttonid)
 	{
+		if (exit_pending)
+			return Button::State::DISABLED;
+
+		if (buttonid >= BtBuy)
+		{
+			const size_t visible_index = static_cast<size_t>(page) * PAGE_SIZE + (buttonid - BtBuy);
+			if (visible_index < visible_items.size())
+			{
+				const int16_t item_index = static_cast<int16_t>(visible_items[visible_index]);
+				choose_item(item_index);
+				const Item& item = items[item_index];
+				BuyCashItemPacket(1, item.sn).dispatch();
+			}
+			return Button::State::NORMAL;
+		}
+
 		switch (buttonid)
 		{
-		case Buttons::BtPreview1:
-		case Buttons::BtPreview2:
-		case Buttons::BtPreview3:
-			buttons[preview_index]->set_state(Button::State::NORMAL);
-
-			preview_index = buttonid;
-			return Button::State::PRESSED;
-		case Buttons::BtExit:
+		case BtExit:
+			schedule_exit();
+			return Button::State::NORMAL;
+		case BtHelp:
+		case BtCoupon:
 		{
-			Constants::Constants::get().clear_viewport_size();
-			Window::get().update_viewport();
+			if (tooltip_item_id != 0)
+			{
+				UI::get().clear_tooltip(Tooltip::Parent::SHOP);
+				tooltip_item_id = 0;
+			}
 
-			float fadestep = 0.025f;
-
-			Window::get().fadeout(
-				fadestep,
-				[]()
-				{
-					GraphicsGL::get().clear();
-					ChangeMapPacket().dispatch();
-				}
-			);
-
-			GraphicsGL::get().lock();
-			Stage::get().clear();
-			Timer::get().start();
-
+			overlay = buttonid == BtHelp ? OVERLAY_HELP : OVERLAY_COUPON;
+			for (auto& button : buttons)
+				button.second->set_active(false);
+			if (overlay == OVERLAY_HELP)
+				buttons[BtHelpClose]->set_active(true);
+			else
+			{
+				buttons[BtCouponSubmit]->set_active(true);
+				buttons[BtCouponCancel]->set_active(true);
+				coupon_field.change_text("");
+				coupon_field.set_state(Textfield::State::NORMAL);
+			}
 			return Button::State::NORMAL;
 		}
-		case Buttons::BtNext:
-		{
-			size_t size = promotion_sprites.size() - 1;
-
-			promotion_index++;
-
-			if (promotion_index > size)
-				promotion_index = 0;
-
+		case BtSearch:
+			applied_search = search_field.get_text();
+			rebuild_filter();
 			return Button::State::NORMAL;
-		}
-		case Buttons::BtPrev:
+		case BtChargeNX:
 		{
-			size_t size = promotion_sprites.size() - 1;
-
-			promotion_index--;
-
-			if (promotion_index < 0)
-				promotion_index = size;
-
-			return Button::State::NORMAL;
-		}
-		case Buttons::BtChargeNX:
-		{
-			std::string url = Configuration::get().get_chargenx();
-
+			const std::string url = Configuration::get().get_chargenx();
 #ifdef _WIN32
 			ShellExecuteA(NULL, "open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);
 #endif
-
 			return Button::State::NORMAL;
 		}
-		case Buttons::BtCoupon:
-			active_subpanel = (active_subpanel == SUBPANEL_COUPON) ? SUBPANEL_NONE : SUBPANEL_COUPON;
+		case BtCouponSubmit:
+			if (!coupon_field.get_text().empty())
+				CouponCodePacket(coupon_field.get_text()).dispatch();
+			close_overlay();
+			return Button::State::NORMAL;
+		case BtCouponCancel:
+		case BtHelpClose:
+			close_overlay();
 			return Button::State::NORMAL;
 		default:
-			break;
+			return Button::State::DISABLED;
 		}
-
-		if (buttonid >= Buttons::BtBuy)
-		{
-			int16_t index = buttonid - Buttons::BtBuy + list_offset;
-
-			if (index >= 0 && index < items.size())
-			{
-				Item item = items[index];
-
-				// Currency type 1 = NX Credit (standard purchase)
-				int8_t currency = 1;
-				BuyCashItemPacket(currency, item.sn).dispatch();
-			}
-
-			return Button::State::NORMAL;
-		}
-
-		return Button::State::DISABLED;
 	}
 
 	Cursor::State UICashShop::send_cursor(bool clicked, Point<int16_t> cursorpos)
 	{
-		Point<int16_t> cursor_relative = cursorpos - position;
+		if (exit_pending)
+			return Cursor::State::IDLE;
 
-		if (list_slider.isenabled())
+		const Point<int16_t> local = cursorpos - position;
+		update_tooltip(cursorpos);
+
+		if (overlay == OVERLAY_COUPON)
 		{
-			Cursor::State state = list_slider.send_cursor(cursor_relative, clicked);
+			const Cursor::State field_state = coupon_field.send_cursor(local, clicked);
+			if (field_state != Cursor::State::IDLE)
+				return field_state;
+			return UIElement::send_cursor(clicked, cursorpos);
+		}
+		if (overlay == OVERLAY_HELP)
+			return UIElement::send_cursor(clicked, cursorpos);
 
-			if (state != Cursor::State::IDLE)
-				return state;
+		if (local.y() < 30)
+		{
+			const Cursor::State field_state = search_field.send_cursor(local, clicked);
+			if (field_state != Cursor::State::IDLE)
+				return field_state;
 		}
 
 		if (clicked)
 		{
-			Point<int16_t> off = cursorpos - position;
-
-			for (int16_t i = 0; i < MAX_ITEMS; i++)
+			// A click on a locker item withdraws it to the character inventory.
+			const std::vector<CashShopItemEntry>& locker = get_cash_shop_items();
+			for (size_t i = 0; i < locker.size() && i < 14; i++)
 			{
-				int16_t index = i + list_offset;
+				const div_t cell = std::div(static_cast<int>(i), 7);
+				const Point<int16_t> slot_pos(777 + 34 * cell.rem, 514 + 34 * cell.quot);
+				const Rectangle<int16_t> slot_bounds(slot_pos, slot_pos + Point<int16_t>(32, 32));
+				if (!slot_bounds.contains(local))
+					continue;
 
-				if (index >= static_cast<int16_t>(items.size()))
-					break;
+				const CashShopItemEntry& item = locker[i];
+				if (get_pending_cash_shop_withdrawal() != 0 || item.instance_id == 0)
+					return Cursor::State::IDLE;
 
-				div_t cdiv = std::div(i, GRID_COLS);
-				Rectangle<int16_t> card(
-					Point<int16_t>(GRID_X + STRIDE_X * cdiv.rem, GRID_Y + STRIDE_Y * cdiv.quot),
-					Point<int16_t>(GRID_X + STRIDE_X * cdiv.rem + CARD_W, GRID_Y + STRIDE_Y * cdiv.quot + CARD_H)
-				);
-
-				if (card.contains(off))
+				Inventory& inventory = Stage::get().get_player().get_inventory();
+				const InventoryType::Id destination = InventoryType::by_item_id(item.item_id);
+				if (inventory.find_free_slot(destination) == 0)
 				{
-					selected_item = index;
+					chat::log("[Cash Shop] Your character inventory is full.", chat::LineType::RED);
+					return Cursor::State::IDLE;
+				}
 
-					int32_t itemid = items[index].get_itemid();
+				set_pending_cash_shop_withdrawal(item.instance_id);
+				WithdrawCashItemPacket(item.instance_id).dispatch();
+				return Cursor::State::IDLE;
+			}
 
-					if (itemid >= 1000000 && itemid < 2000000)
-					{
-						// Try-on: current look plus the selected equip
-						preview_look = Stage::get().get_player().get_look();
-						preview_look.add_equip(itemid);
-						preview_look.set_stance(static_cast<Stance::Id>(cur_stance));
-					}
-
-					break;
+			for (uint8_t i = 0; i < CATEGORY_COUNT; i++)
+			{
+				const Rectangle<int16_t> category_bounds(Point<int16_t>(12, 100 + 32 * i), Point<int16_t>(156, 124 + 32 * i));
+				if (category_bounds.contains(local))
+				{
+					category = i;
+					page = 0;
+					rebuild_filter();
+					return Cursor::State::IDLE;
 				}
 			}
+
+			for (size_t i = 0; i < PAGE_SIZE; i++)
+			{
+				const size_t visible_index = static_cast<size_t>(page) * PAGE_SIZE + i;
+				if (visible_index >= visible_items.size())
+					break;
+
+				const div_t cell = std::div(static_cast<int>(i), GRID_COLS);
+				const Point<int16_t> card_pos(
+					GRID_X + STRIDE_X * cell.rem,
+					GRID_Y + STRIDE_Y * cell.quot);
+				const Rectangle<int16_t> card_bounds(card_pos, card_pos + Point<int16_t>(CARD_W, CARD_H));
+				if (!card_bounds.contains(local))
+					continue;
+
+				const Button* buy_button = buttons.at(BtBuy + i).get();
+				if (!buy_button->bounds(position).contains(cursorpos))
+					choose_item(static_cast<int16_t>(visible_items[visible_index]));
+				break;
+			}
+		}
+
+		if (list_slider.isenabled())
+		{
+			const Cursor::State state = list_slider.send_cursor(local, clicked);
+			if (state != Cursor::State::IDLE)
+				return state;
 		}
 
 		return UIElement::send_cursor(clicked, cursorpos);
@@ -559,31 +602,19 @@ namespace ms
 	void UICashShop::exit_cashshop()
 	{
 		UI& ui = UI::get();
-
-		// Restore the regular logical canvas and its matching viewport before
-		// rebuilding the gameplay UI.
-		//
-		// This has to happen *before* change_state: UIStateGame and every
-		// window it builds lay themselves out against the logical viewport
-		// that is live at construction time (UIChatBar's baseline, UIStatusBar's
-		// right-edge buttons, and the reference viewport UIDragElement records
-		// for the positions it loads from the config). Constructing them while
-		// the cash shop's 1024x768 was still in force left the whole HUD
-		// anchored to a viewport that vanished a frame later.
 		Constants::Constants::get().clear_viewport_size();
 		Window::get().update_viewport();
-
 		ui.change_state(UI::State::GAME);
 
 		Stage& stage = Stage::get();
 		Player& player = stage.get_player();
-
 		PlayerLoginPacket(player.get_oid()).dispatch();
 
-		int32_t mapid = player.get_stats().get_mapid();
-		uint8_t portalid = player.get_stats().get_portal();
-
-		stage.load(mapid, portalid);
+		// The cash shop preview is still an ACTIVE Stage. Stage::load only
+		// reloads a map from INACTIVE/TRANSITION, so clear the preview before
+		// restoring the map and portal captured when the shop was opened.
+		stage.clear();
+		stage.load(return_mapid, return_portalid);
 		stage.transfer_player();
 
 		ui.enable();
@@ -591,59 +622,225 @@ namespace ms
 		GraphicsGL::get().unlock();
 	}
 
+	void UICashShop::rebuild_filter()
+	{
+		visible_items.clear();
+		const std::string query = string_format::tolower(search_field.get_text());
+
+		for (size_t i = 0; i < items.size(); i++)
+		{
+			const Item& item = items[i];
+			if (!item_matches_category(item))
+				continue;
+
+			if (!query.empty() && string_format::tolower(item.get_name()).find(query) == std::string::npos)
+				continue;
+
+			visible_items.push_back(i);
+		}
+
+		selected_item = -1;
+		preview_look = Stage::get().get_player().get_look();
+		preview_look.set_stance(static_cast<Stance::Id>(cur_stance));
+
+		page = 0;
+		update_items();
+	}
+
 	void UICashShop::update_items()
 	{
-		for (size_t i = 0; i < MAX_ITEMS; i++)
+		if (tooltip_item_id != 0)
 		{
-			int16_t index = i + list_offset;
-			bool found_item = index < items.size();
+			UI::get().clear_tooltip(Tooltip::Parent::SHOP);
+			tooltip_item_id = 0;
+		}
 
-			buttons[Buttons::BtBuy + i]->set_active(found_item);
+		const size_t page_count = std::max<size_t>(1, (visible_items.size() + PAGE_SIZE - 1) / PAGE_SIZE);
+		if (page >= static_cast<int16_t>(page_count))
+			page = static_cast<int16_t>(page_count - 1);
 
-			std::string name = "";
-			std::string price_text = "";
-			std::string discount_text = "";
-			std::string percent_text = "";
+		list_slider.setrows(page, 1, static_cast<int16_t>(page_count));
+		list_slider.setenabled(page_count > 1);
 
-			if (found_item)
+		for (size_t i = 0; i < PAGE_SIZE; i++)
+		{
+			const size_t visible_index = static_cast<size_t>(page) * PAGE_SIZE + i;
+			const bool found = visible_index < visible_items.size();
+			buttons[BtBuy + i]->set_active(found && overlay == OVERLAY_NONE);
+
+			if (!found)
 			{
-				Item item = items[index];
-
-				name = item.get_name();
-
-				int32_t price = item.get_price();
-				price_text = std::to_string(price);
-
-				if (item.discount_price > 0 && price > 0)
-				{
-					discount_text = price_text;
-
-					uint32_t discount = item.discount_price;
-					price_text = std::to_string(discount);
-
-					float_t percent = (float)discount / price;
-					std::string percent_str = std::to_string(percent);
-					percent_text = "(" + percent_str.substr(2, 1) + "%)";
-				}
-
-				string_format::split_number(price_text);
-				string_format::split_number(discount_text);
-
-				price_text += " NX";
-
-				if (discount_text != "")
-					discount_text += " NX";
-
-				if (item.count > 0)
-					price_text += "(" + std::to_string(item.count) + ")";
+				item_name[i].change_text("");
+				item_price[i].change_text("");
+				item_count[i].change_text("");
+				continue;
 			}
 
-			item_name[i].change_text(name);
-			item_price[i].change_text(price_text);
-			item_discount[i].change_text(discount_text);
-			item_percent[i].change_text(percent_text);
+			const Item& item = items[visible_items[visible_index]];
+			item_name[i].change_text(item.get_name());
+			string_format::format_with_ellipsis(item_name[i], 98);
 
-			string_format::format_with_ellipsis(item_name[i], 92);
+			std::string price = std::to_string(item.price);
+			string_format::split_number(price);
+			item_price[i].change_text(price + " NX");
+			item_count[i].change_text(item.count > 1 ? "Bundle of " + std::to_string(item.count) : "");
 		}
+
+		if (overlay == OVERLAY_NONE)
+			for (auto& button : buttons)
+				if (button.first < BtCouponSubmit)
+					button.second->set_active(true);
+
+		for (size_t i = 0; i < PAGE_SIZE; i++)
+			buttons[BtBuy + i]->set_active((static_cast<size_t>(page) * PAGE_SIZE + i) < visible_items.size() && overlay == OVERLAY_NONE);
+	}
+
+	void UICashShop::update_tooltip(Point<int16_t> cursorpos)
+	{
+		int32_t hover_item_id = 0;
+		if (overlay == OVERLAY_NONE)
+		{
+			const Point<int16_t> local = cursorpos - position;
+			for (size_t i = 0; i < PAGE_SIZE; i++)
+			{
+				const size_t visible_index = static_cast<size_t>(page) * PAGE_SIZE + i;
+				if (visible_index >= visible_items.size())
+					break;
+
+				const div_t cell = std::div(static_cast<int>(i), GRID_COLS);
+				const Point<int16_t> card_pos(
+					GRID_X + STRIDE_X * cell.rem,
+					GRID_Y + STRIDE_Y * cell.quot);
+				const Rectangle<int16_t> card_bounds(card_pos, card_pos + Point<int16_t>(CARD_W, CARD_H));
+				if (card_bounds.contains(local))
+				{
+					hover_item_id = items[visible_items[visible_index]].get_itemid();
+					break;
+				}
+			}
+		}
+
+		if (hover_item_id == tooltip_item_id)
+			return;
+
+		if (hover_item_id != 0)
+			UI::get().show_item(Tooltip::Parent::SHOP, hover_item_id);
+		else if (tooltip_item_id != 0)
+			UI::get().clear_tooltip(Tooltip::Parent::SHOP);
+
+		tooltip_item_id = hover_item_id;
+	}
+
+	void UICashShop::choose_item(int16_t index)
+	{
+		if (index < 0 || index >= static_cast<int16_t>(items.size()))
+			return;
+
+		selected_item = index;
+		Player& player = Stage::get().get_player();
+		preview_look = player.get_look();
+
+		const int32_t item_id = items[index].get_itemid();
+		if (item_id >= 1000000 && item_id < 2000000)
+			preview_look.add_equip(item_id);
+
+		preview_look.set_stance(static_cast<Stance::Id>(cur_stance));
+	}
+
+	void UICashShop::navigate_items(int32_t offset)
+	{
+		if (visible_items.empty())
+			return;
+
+		const auto selected = std::find(visible_items.begin(), visible_items.end(),
+			static_cast<size_t>(selected_item));
+		const int32_t current = selected == visible_items.end()
+			? -1
+			: static_cast<int32_t>(std::distance(visible_items.begin(), selected));
+		const int32_t target = current < 0
+			? 0
+			: std::max<int32_t>(0, std::min<int32_t>(static_cast<int32_t>(visible_items.size()) - 1,
+				current + offset));
+		const int16_t target_page = static_cast<int16_t>(target / PAGE_SIZE);
+		if (target_page != page)
+		{
+			page = target_page;
+			update_items();
+		}
+
+		choose_item(static_cast<int16_t>(visible_items[target]));
+	}
+
+	bool UICashShop::item_matches_category(const Item& item) const
+	{
+		if (category == ALL_ITEMS)
+			return true;
+
+		const int32_t item_id = item.get_itemid();
+		const int32_t item_type = item_id / 1000000;
+		const int32_t item_prefix = item_id / 10000;
+		switch (category)
+		{
+		case EQUIPMENT: return item_type == 1;
+		case USE_ITEMS: return item_type == 2;
+		case SETUP_ITEMS: return item_type == 3;
+		case ETC_ITEMS: return item_type == 4;
+		case CASH_ITEMS: return item_type >= 5;
+		case PET_ITEMS: return item_prefix == 500;
+		case PET_EQUIPS: return item_prefix == 180 || item_prefix == 181;
+		case PET_MISC:
+			// Pet name tags and pet food are sold as separate item families.
+			return (item_prefix >= 182 && item_prefix < 190) || item_prefix == 212;
+		default: return true;
+		}
+	}
+
+	void UICashShop::close_overlay()
+	{
+		if (overlay == OVERLAY_COUPON)
+		{
+			UI::get().remove_textfield();
+			coupon_field.set_state(Textfield::State::NORMAL);
+		}
+
+		overlay = OVERLAY_NONE;
+		buttons[BtCouponSubmit]->set_active(false);
+		buttons[BtCouponCancel]->set_active(false);
+		buttons[BtHelpClose]->set_active(false);
+		for (auto& button : buttons)
+			if (button.first < BtCouponSubmit)
+				button.second->set_active(true);
+		update_items();
+	}
+
+	void UICashShop::schedule_exit()
+	{
+		if (exit_pending)
+			return;
+
+		exit_pending = true;
+		Constants::Constants::get().clear_viewport_size();
+		Window::get().update_viewport();
+
+		Window::get().fadeout(
+			0.025f,
+			[]()
+			{
+				GraphicsGL::get().clear();
+				ChangeMapPacket().dispatch();
+			}
+		);
+
+		GraphicsGL::get().lock();
+		Stage::get().clear();
+		Timer::get().start();
+	}
+
+	void UICashShop::request_exit()
+	{
+		if (overlay != OVERLAY_NONE)
+			close_overlay();
+		else
+			schedule_exit();
 	}
 }

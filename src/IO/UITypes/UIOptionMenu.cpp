@@ -325,9 +325,11 @@ namespace ms
 		slider_val[SL_HP_WARNING] = Setting<HPWarning>::get().load();
 		slider_val[SL_MP_WARNING] = Setting<MPWarning>::get().load();
 
-		// Resolution radio buttons (cosmetic only — does not change resolution)
-		check_val[CHK_RES_800] = false;
-		check_val[CHK_RES_1024] = true;
+		// Show the configured client size instead of always claiming 1024x768.
+		int16_t width = Setting<Width>::get().load();
+		int16_t height = Setting<Height>::get().load();
+		check_val[CHK_RES_800] = (width == 800 && height == 600);
+		check_val[CHK_RES_1024] = (width == 1024 && height == 768);
 
 		// Windowed checkbox (inverted from Fullscreen setting)
 		check_val[CHK_WINDOWED] = !Setting<Fullscreen>::get().load();

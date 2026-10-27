@@ -291,6 +291,15 @@ namespace ms
 					{
 						switch (action)
 						{
+					case KeyAction::Id::NPC_CHAT:
+					{
+						// Some v83 servers encode NPC Chat in the MENU key type;
+						// newer clients use ACTION for the same keymap slot.
+						if (pressed)
+							Stage::get().get_npcs().interact_nearby(
+								Stage::get().get_player().get_position());
+						break;
+					}
 							case KeyAction::Id::EQUIPMENT:
 							{
 								emplace<UIEquipInventory>(

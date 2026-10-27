@@ -103,7 +103,10 @@ namespace ms
 				{
 					// Save the "Login ID" if the box for it on the login screen is checked
 					if (Setting<SaveLogin>::get().load())
+					{
 						Setting<DefaultAccount>::get().save(account.name);
+						Configuration::get().save();
+					}
 
 					// Request the list of worlds and channels online
 					ServerRequestPacket().dispatch();

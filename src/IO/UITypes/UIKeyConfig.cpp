@@ -202,7 +202,7 @@ namespace ms
 		unbound_actions_pos[KeyAction::Id::SIT] = Point<int16_t>(row_x + (slot_width * 12), row_y + (slot_height * 0));
 		unbound_actions_pos[KeyAction::Id::ATTACK] = Point<int16_t>(row_x + (slot_width * 13), row_y + (slot_height * 0));
 		unbound_actions_pos[KeyAction::Id::JUMP] = Point<int16_t>(row_x + (slot_width * 14), row_y + (slot_height * 0));
-		unbound_actions_pos[KeyAction::Id::INTERACT_HARVEST] = Point<int16_t>(row_x + (slot_width * 15), row_y + (slot_height * 0));
+		unbound_actions_pos[KeyAction::Id::NPC_CHAT] = Point<int16_t>(row_x + (slot_width * 15), row_y + (slot_height * 0));
 		unbound_actions_pos[KeyAction::Id::MONSTERBOOK] = Point<int16_t>(row_x + (slot_width * 16), row_y + (slot_height * 0));
 
 		// Row 1
@@ -299,7 +299,7 @@ namespace ms
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::SIT), KeyAction::Id::SIT));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::ATTACK), KeyAction::Id::ATTACK));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::JUMP), KeyAction::Id::JUMP));
-		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::INTERACT_HARVEST), KeyAction::Id::INTERACT_HARVEST));
+		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::NPC_CHAT), KeyAction::Id::NPC_CHAT));
 		// Face actions (type 6)
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::FACE1), KeyAction::Id::FACE1));
 		action_mappings.push_back(Keyboard::Mapping(get_keytype(KeyAction::Id::FACE2), KeyAction::Id::FACE2));
@@ -374,7 +374,7 @@ namespace ms
 			{ KeyAction::Id::SIT, 51 },
 			{ KeyAction::Id::ATTACK, 52 },
 			{ KeyAction::Id::JUMP, 53 },
-			{ KeyAction::Id::INTERACT_HARVEST, 54 },
+			{ KeyAction::Id::NPC_CHAT, 54 },
 		};
 
 		for (auto& [action, idx] : action_actions)
@@ -514,6 +514,8 @@ namespace ms
 	void UIKeyConfig::close()
 	{
 		clear_tooltip();
+		if (quickslot_dirty)
+			persist_quickslot_keys(original_quickslot_keys);
 		keyboard->set_quickslot_keys(original_quickslot_keys);
 		quickslot_dirty = false;
 		deactivate();
@@ -768,6 +770,8 @@ namespace ms
 		}
 
 		keyboard->set_quickslot_keys(quickslots);
+		if (old_key != new_key)
+			persist_quickslot_keys(quickslots);
 		quickslot_edit_index = -1;
 	}
 
@@ -973,6 +977,12 @@ namespace ms
 		}
 	}
 
+	void UIKeyConfig::persist_quickslot_keys(const std::array<uint8_t, Keyboard::NUM_QUICKSLOT_KEYS>& keys)
+	{
+		Setting<QuickSlotKeys>::get().save(Keyboard::format_quickslot_keys(keys));
+		Configuration::get().save();
+	}
+
 	void UIKeyConfig::save_staged_mappings()
 	{
 		std::vector<std::tuple<KeyConfig::Key, KeyType::Id, int32_t>> updated_actions;
@@ -1027,8 +1037,7 @@ namespace ms
 		original_quickslot_keys = keyboard->get_quickslot_keys();
 		if (quickslot_dirty)
 		{
-			Setting<QuickSlotKeys>::get().save(Keyboard::format_quickslot_keys(original_quickslot_keys));
-			Configuration::get().save();
+			persist_quickslot_keys(original_quickslot_keys);
 			quickslot_dirty = false;
 		}
 		dirty = false;
@@ -1140,7 +1149,8 @@ namespace ms
 
 	bool UIKeyConfig::is_action_mapping(Keyboard::Mapping mapping) const
 	{
-		return std::find(action_mappings.begin(), action_mappings.end(), mapping) != action_mappings.end();
+		return std::find(action_mappings.begin(), action_mappings.end(), mapping) != action_mappings.end()
+			|| mapping == Keyboard::Mapping(KeyType::Id::MENU, KeyAction::Id::NPC_CHAT);
 	}
 
 	KeyType::Id UIKeyConfig::get_keytype(KeyAction::Id action)
@@ -1195,7 +1205,7 @@ namespace ms
 		case KeyAction::Id::SIT:
 		case KeyAction::Id::ATTACK:
 		case KeyAction::Id::JUMP:
-		case KeyAction::Id::INTERACT_HARVEST:
+		case KeyAction::Id::NPC_CHAT:
 			return KeyType::Id::ACTION;
 		case KeyAction::Id::FACE1:
 		case KeyAction::Id::FACE2:

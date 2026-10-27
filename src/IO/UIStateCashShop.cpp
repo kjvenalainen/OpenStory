@@ -25,6 +25,7 @@ namespace ms
 	UIStateCashShop::UIStateCashShop()
 	{
 		focused = UIElement::NONE;
+		tooltipparent = Tooltip::Parent::NONE;
 
 		emplace<UICashShop>();
 	}
@@ -38,6 +39,9 @@ namespace ms
 			if (element && element->is_active())
 				element->draw(inter);
 		}
+
+		if (tooltip)
+			tooltip->draw(cursor + Point<int16_t>(0, 22));
 	}
 
 	void UIStateCashShop::update()
@@ -90,7 +94,7 @@ namespace ms
 		if (pressed && escape)
 		{
 			if (auto cashshop = dynamic_cast<UICashShop*>(get(UIElement::Type::CASHSHOP)))
-				cashshop->exit_cashshop();
+				cashshop->request_exit();
 		}
 	}
 
@@ -98,6 +102,29 @@ namespace ms
 	{
 		if (auto front = get_front())
 			front->send_scroll(yoffset);
+	}
+
+	void UIStateCashShop::clear_tooltip(Tooltip::Parent parent)
+	{
+		if (parent != tooltipparent)
+			return;
+
+		item_tooltip.set_item(0);
+		tooltip = Optional<Tooltip>();
+		tooltipparent = Tooltip::Parent::NONE;
+	}
+
+	void UIStateCashShop::show_item(Tooltip::Parent parent, int32_t itemid)
+	{
+		if (itemid == 0)
+		{
+			clear_tooltip(parent);
+			return;
+		}
+
+		item_tooltip.set_item(itemid);
+		tooltip = item_tooltip;
+		tooltipparent = parent;
 	}
 
 	UIState::Iterator UIStateCashShop::pre_add(UIElement::Type type, bool toggled, bool is_focused)
